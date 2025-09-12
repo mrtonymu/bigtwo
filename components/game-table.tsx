@@ -35,6 +35,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
     cardSorting: "auto",
     autoArrange: true,
   })
+  const [showGameStart, setShowGameStart] = useState(false)
   const supabase = createClient()
 
   // 重连功能
@@ -135,7 +136,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       toast.error("获取游戏数据失败")
       setIsLoading(false)
     }
-  }, [gameId, playerName, gameOptions, gameWinner, supabase])
+  }, [gameId, playerName, gameOptions.autoArrange, gameOptions.cardSorting, gameWinner])
 
   useEffect(() => {
     // Subscribe to game updates
@@ -323,15 +324,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
     }
   }
 
-  const isMyTurn = gameState?.currentPlayer === myPosition
-
-  if (isLoading) {
-    return <GameTableSkeleton />
-  }
-
   // Show game start message if game just started (only show briefly)
-  const [showGameStart, setShowGameStart] = useState(false)
-  
   useEffect(() => {
     if (gameState && gameState.turnCount === 0 && myCards.length > 0) {
       setShowGameStart(true)
@@ -342,6 +335,12 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       return () => clearTimeout(timer)
     }
   }, [gameState, myCards])
+
+  const isMyTurn = gameState?.currentPlayer === myPosition
+
+  if (isLoading) {
+    return <GameTableSkeleton />
+  }
 
   if (showGameStart) {
     return (
