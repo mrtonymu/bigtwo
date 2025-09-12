@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import Link from "next/link"
 import toast from "react-hot-toast"
+import { AppWrapper } from "@/components/app-wrapper"
 
 export default function GamePage() {
   const params = useParams()
@@ -211,5 +212,9 @@ export default function GamePage() {
     )
   }
 
-  return <GameTable gameId={gameId} playerName={playerName} />
+  return (
+    <AppWrapper>
+      <GameTable gameId={gameId} playerName={playerName} />
+    </AppWrapper>
+  )
 }

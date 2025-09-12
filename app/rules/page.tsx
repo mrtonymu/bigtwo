@@ -2,12 +2,14 @@ import { Header } from "@/components/header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { AppWrapper } from "@/components/app-wrapper"
 
 export default function RulesPage() {
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
+    <AppWrapper>
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="space-y-6">
           <div className="text-center">
             <h1 className="text-3xl font-bold mb-4">CNFLIX 使用说明</h1>
@@ -100,5 +102,6 @@ export default function RulesPage() {
         </div>
       </main>
     </div>
+    </AppWrapper>
   )
 }
