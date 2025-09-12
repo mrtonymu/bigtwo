@@ -24,8 +24,8 @@ export interface Player {
 
 // Create a standard 52-card deck
 export function createDeck(): Card[] {
-  const suits: Card["suit"][] = ["hearts", "diamonds", "clubs", "spades"]
-  const ranks = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] // 3-K, A, 2
+  const suits: Card["suit"][] = ["diamonds", "clubs", "hearts", "spades"] // 方块 < 梅花 < 红心 < 黑桃
+  const ranks = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] // 3, 4, 5, 6, 7, 8, 9, 10, J, Q, K, A, 2
   const displays = ["3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A", "2"]
 
   const deck: Card[] = []
@@ -151,14 +151,9 @@ export function dealCards(deck: Card[], numPlayers: number): Card[][] {
 export function isValidPlay(cards: Card[], lastPlay: Card[], playerCount: number = 4, remainingCards: Card[] = []): boolean {
   if (cards.length === 0) return false
 
-  // First play of the game
+  // First play of the game - must always start with ♦3 (方块3)
   if (lastPlay.length === 0) {
-    // For 2-3 players, must start with ♦3
-    if (playerCount < 4) {
-      return isValidCombination(cards) && hasDiamond3(cards)
-    }
-    // For 4 players, can start with any valid combination
-    return isValidCombination(cards)
+    return isValidCombination(cards) && hasDiamond3(cards)
   }
 
   // Must play same number of cards
@@ -203,16 +198,30 @@ function hasDiamond3(cards: Card[]): boolean {
 
 // Check if five cards form a valid hand (straight, flush, full house, four of a kind + one)
 function isFiveCardHand(cards: Card[]): boolean {
-  const sorted = [...cards].sort((a, b) => a.rank - b.rank)
+  if (cards.length !== 5) return false
+  
+  const sorted = [...cards].sort((a, b) => getCardValue(a) - getCardValue(b))
 
-  // Check for straight
-  const isStraight = sorted.every((card, i) => i === 0 || card.rank === sorted[i - 1].rank + 1)
-
-  // Check for flush
+  // Check for flush (同花)
   const isFlush = cards.every((card) => card.suit === cards[0].suit)
 
-  // Check for full house
-  const ranks = sorted.map((c) => c.rank)
+  // Check for straight (顺子) - handle A-2-3-4-5 and 10-J-Q-K-A
+  const ranks = sorted.map(c => c.rank)
+  const isStraight = ranks.every((rank, i) => {
+    if (i === 0) return true
+    const prevRank = ranks[i - 1]
+    // Handle A-2-3-4-5 straight
+    if (prevRank === 15 && rank === 3) return true
+    // Handle normal straight
+    return rank === prevRank + 1
+  }) || 
+  // Handle 10-J-Q-K-A straight
+  ranks[0] === 10 && ranks[1] === 11 && ranks[2] === 12 && ranks[3] === 13 && ranks[4] === 14
+
+  // Check for straight flush (同花顺)
+  const isStraightFlush = isStraight && isFlush
+
+  // Check for four of a kind + one (四条/金刚)
   const rankCounts = ranks.reduce(
     (acc, rank) => {
       acc[rank] = (acc[rank] || 0) + 1
@@ -221,12 +230,12 @@ function isFiveCardHand(cards: Card[]): boolean {
     {} as Record<number, number>,
   )
   const counts = Object.values(rankCounts).sort()
+  const isFourOfAKind = counts.length === 2 && counts[0] === 1 && counts[1] === 4
+
+  // Check for full house (葫芦)
   const isFullHouse = counts.length === 2 && counts[0] === 2 && counts[1] === 3
 
-  // Check for four of a kind + one (金刚)
-  const isFourOfAKindPlusOne = counts.length === 2 && counts[0] === 1 && counts[1] === 4
-
-  return isStraight || isFlush || isFullHouse || isFourOfAKindPlusOne
+  return isStraightFlush || isFourOfAKind || isFullHouse || isFlush || isStraight
 }
 
 // Check if combination A is higher than combination B
@@ -253,24 +262,43 @@ function isHigherCombination(cardsA: Card[], cardsB: Card[]): boolean {
 
 // Get numeric value for card comparison
 function getCardValue(card: Card): number {
-  // Suit order: hearts < diamonds < clubs < spades
-  const suitValue = ["hearts", "diamonds", "clubs", "spades"].indexOf(card.suit)
-  return card.rank * 4 + suitValue
+  // Suit order: diamonds < clubs < hearts < spades (方块 < 梅花 < 红心 < 黑桃)
+  const suitValue = ["diamonds", "clubs", "hearts", "spades"].indexOf(card.suit)
+  // Rank order: 3 < 4 < 5 < 6 < 7 < 8 < 9 < 10 < J < Q < K < A < 2
+  // 2 is the highest, so it gets the highest value
+  const rankValue = card.rank === 15 ? 13 : card.rank - 3 // 2=13, A=12, K=11, ..., 3=0
+  return rankValue * 4 + suitValue
 }
 
 
 // Get hand value for five card combinations
 function getHandValue(cards: Card[]): number {
-  const sorted = [...cards].sort((a, b) => a.rank - b.rank)
+  const sorted = [...cards].sort((a, b) => getCardValue(a) - getCardValue(b))
   const isFlush = cards.every((card) => card.suit === cards[0].suit)
-  const isStraight = sorted.every((card, i) => i === 0 || card.rank === sorted[i - 1].rank + 1)
+  
+  // Check for straight (顺子) - handle A-2-3-4-5 and 10-J-Q-K-A
+  const ranks = sorted.map(c => c.rank)
+  const isStraight = ranks.every((rank, i) => {
+    if (i === 0) return true
+    const prevRank = ranks[i - 1]
+    // Handle A-2-3-4-5 straight
+    if (prevRank === 15 && rank === 3) return true
+    // Handle normal straight
+    return rank === prevRank + 1
+  }) || 
+  // Handle 10-J-Q-K-A straight
+  ranks[0] === 10 && ranks[1] === 11 && ranks[2] === 12 && ranks[3] === 13 && ranks[4] === 14
 
-  if (isStraight && isFlush) return 8000 + sorted[4].rank // Straight flush
-  if (isFlush) return 5000 + sorted[4].rank // Flush
-  if (isStraight) return 4000 + sorted[4].rank // Straight
+  // Check for straight flush (同花顺) - highest
+  if (isStraight && isFlush) {
+    // For A-2-3-4-5 straight flush, use 5 as the high card
+    if (ranks[0] === 3 && ranks[4] === 15) {
+      return 9000 + getCardValue(sorted[0]) // Use 5 as high card
+    }
+    return 9000 + getCardValue(sorted[4]) // Use highest card
+  }
 
-  // Check for four of a kind + one (金刚) and full house
-  const ranks = sorted.map((c) => c.rank)
+  // Check for four of a kind + one (四条/金刚)
   const rankCounts = ranks.reduce(
     (acc, rank) => {
       acc[rank] = (acc[rank] || 0) + 1
@@ -278,18 +306,31 @@ function getHandValue(cards: Card[]): number {
     },
     {} as Record<number, number>,
   )
-
   const counts = Object.values(rankCounts).sort()
   
-  // Four of a kind + one (金刚)
   if (counts.length === 2 && counts[0] === 1 && counts[1] === 4) {
     const fourOfAKindRank = Object.keys(rankCounts).find((rank) => rankCounts[Number(rank)] === 4)
-    return 7000 + Number(fourOfAKindRank) // Four of a kind + one (金刚)
+    return 8000 + getCardValue({ suit: "spades", rank: Number(fourOfAKindRank), display: "" }) // Four of a kind + one
   }
 
-  // Full house
-  const tripleRank = Object.keys(rankCounts).find((rank) => rankCounts[Number(rank)] === 3)
-  if (tripleRank) return 6000 + Number(tripleRank) // Full house
+  // Check for full house (葫芦)
+  if (counts.length === 2 && counts[0] === 2 && counts[1] === 3) {
+    const tripleRank = Object.keys(rankCounts).find((rank) => rankCounts[Number(rank)] === 3)
+    return 7000 + getCardValue({ suit: "spades", rank: Number(tripleRank), display: "" }) // Full house
+  }
 
-  return Math.max(...cards.map(getCardValue)) // High card
+  // Flush (同花)
+  if (isFlush) return 6000 + getCardValue(sorted[4]) // Flush
+
+  // Straight (顺子)
+  if (isStraight) {
+    // For A-2-3-4-5 straight, use 5 as the high card
+    if (ranks[0] === 3 && ranks[4] === 15) {
+      return 5000 + getCardValue(sorted[0]) // Use 5 as high card
+    }
+    return 5000 + getCardValue(sorted[4]) // Use highest card
+  }
+
+  // High card
+  return getCardValue(sorted[4])
 }
