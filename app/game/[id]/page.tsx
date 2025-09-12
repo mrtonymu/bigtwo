@@ -92,8 +92,8 @@ export default function GamePage() {
     
     try {
       // Create deck and deal cards
-      const deck = createDeck()
-      const hands = dealCards(deck, playerCount)
+      const originalDeck = createDeck()
+      const hands = dealCards([...originalDeck], playerCount) // Use copy to avoid modifying original
 
       // Get all players
       const { data: playersData } = await supabase
@@ -111,11 +111,15 @@ export default function GamePage() {
       }
 
       // Create initial game state
+      // For 4 players, all 52 cards are dealt, so no remaining cards
+      const remainingCards = playerCount === 4 ? [] : originalDeck.slice(playerCount * 13)
+      console.log(`Creating game state for ${playerCount} players, remaining cards: ${remainingCards.length}`)
+      
       const { error: gameStateError } = await supabase.from("game_state").insert({
         game_id: gameId,
         current_player: 0,
         last_play: [],
-        deck: deck.slice(playerCount * 13), // remaining cards
+        deck: remainingCards, // remaining cards
         turn_count: 0,
       })
 
