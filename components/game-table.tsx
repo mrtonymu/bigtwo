@@ -65,10 +65,26 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       ])
 
       if (playersResult.error) throw playersResult.error
-      if (gameStateResult.error) throw gameStateResult.error
-
+      
       const playersData = playersResult.data || []
       const gameStateData = gameStateResult.data
+
+      // 如果游戏状态不存在，说明游戏还没开始
+      if (gameStateResult.error && gameStateResult.error.code === 'PGRST116') {
+        console.log("Game state not found, game not started yet")
+        setGameState(null)
+        setPlayers(playersData.map((p) => ({
+          id: p.id,
+          name: p.player_name,
+          position: p.position,
+          cards: p.cards || [],
+          isSpectator: p.is_spectator,
+        })))
+        setIsLoading(false)
+        return
+      }
+
+      if (gameStateResult.error) throw gameStateResult.error
 
       // 转换玩家数据格式
       const playersList = playersData.map((p) => ({
@@ -163,48 +179,83 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
   const handlePlay = async () => {
     if (!gameState || selectedCards.length === 0) return
 
-    // Validate play
-    if (!isValidPlay(selectedCards, gameState.lastPlay)) {
-      alert("Invalid play! Please select valid cards.")
-      return
+    try {
+      // Validate play
+      if (!isValidPlay(selectedCards, gameState.lastPlay)) {
+        toast.error("出牌无效！请选择有效的牌型")
+        return
+      }
+
+      // Update player's cards
+      const newCards = myCards.filter(
+        (card) => !selectedCards.some((selected) => selected.suit === card.suit && selected.rank === card.rank),
+      )
+
+      // Update player
+      const { error: playerError } = await supabase
+        .from("players")
+        .update({ cards: newCards })
+        .eq("game_id", gameId)
+        .eq("player_name", playerName)
+
+      if (playerError) {
+        console.error("Error updating player cards:", playerError)
+        toast.error("更新手牌失败")
+        return
+      }
+
+      // Update game state
+      const nextPlayer = (gameState.currentPlayer + 1) % players.length
+      const { error: gameStateError } = await supabase
+        .from("game_state")
+        .update({
+          current_player: nextPlayer,
+          last_play: selectedCards,
+          last_player: myPosition,
+          turn_count: gameState.turnCount + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("game_id", gameId)
+
+      if (gameStateError) {
+        console.error("Error updating game state:", gameStateError)
+        toast.error("更新游戏状态失败")
+        return
+      }
+
+      setSelectedCards([])
+      toast.success("出牌成功！")
+    } catch (error) {
+      console.error("Error playing cards:", error)
+      toast.error("出牌失败，请重试")
     }
-
-    // Update player's cards
-    const newCards = myCards.filter(
-      (card) => !selectedCards.some((selected) => selected.suit === card.suit && selected.rank === card.rank),
-    )
-
-    // Update player
-    await supabase.from("players").update({ cards: newCards }).eq("game_id", gameId).eq("player_name", playerName)
-
-    // Update game state
-    const nextPlayer = (gameState.currentPlayer + 1) % players.length
-    await supabase
-      .from("game_state")
-      .update({
-        current_player: nextPlayer,
-        last_play: selectedCards,
-        last_player: myPosition,
-        turn_count: gameState.turnCount + 1,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("game_id", gameId)
-
-    setSelectedCards([])
   }
 
   const handlePass = async () => {
     if (!gameState) return
 
-    const nextPlayer = (gameState.currentPlayer + 1) % players.length
-    await supabase
-      .from("game_state")
-      .update({
-        current_player: nextPlayer,
-        turn_count: gameState.turnCount + 1,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("game_id", gameId)
+    try {
+      const nextPlayer = (gameState.currentPlayer + 1) % players.length
+      const { error } = await supabase
+        .from("game_state")
+        .update({
+          current_player: nextPlayer,
+          turn_count: gameState.turnCount + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("game_id", gameId)
+
+      if (error) {
+        console.error("Error passing turn:", error)
+        toast.error("跳过回合失败")
+        return
+      }
+
+      toast.success("已跳过回合")
+    } catch (error) {
+      console.error("Error passing turn:", error)
+      toast.error("跳过回合失败，请重试")
+    }
   }
 
   const startNewGame = async () => {

@@ -25,10 +25,16 @@ export default function GamePage() {
   useEffect(() => {
     checkGameStatus()
 
-    // Subscribe to player changes
+    // Subscribe to player and game changes
     const channel = supabase
       .channel(`game-${gameId}-status`)
       .on("postgres_changes", { event: "*", schema: "public", table: "players", filter: `game_id=eq.${gameId}` }, () =>
+        checkGameStatus(),
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "games", filter: `id=eq.${gameId}` }, () =>
+        checkGameStatus(),
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "game_state", filter: `game_id=eq.${gameId}` }, () =>
         checkGameStatus(),
       )
       .subscribe()
@@ -95,7 +101,7 @@ export default function GamePage() {
       }
 
       // Create initial game state
-      await supabase.from("game_state").insert({
+      const { error: gameStateError } = await supabase.from("game_state").insert({
         game_id: gameId,
         current_player: 0,
         last_play: [],
@@ -103,12 +109,27 @@ export default function GamePage() {
         turn_count: 0,
       })
 
+      if (gameStateError) {
+        console.error("Error creating game state:", gameStateError)
+        throw gameStateError
+      }
+
       // Update game status
-      await supabase.from("games").update({ status: "in-progress" }).eq("id", gameId)
+      const { error: updateGameError } = await supabase.from("games").update({ status: "in-progress" }).eq("id", gameId)
+      
+      if (updateGameError) {
+        console.error("Error updating game status:", updateGameError)
+        throw updateGameError
+      }
       
       toast.dismiss(loadingToast)
       toast.success("游戏开始！")
       setGameStatus("ready")
+      
+      // 刷新游戏状态，确保所有玩家都能看到更新
+      setTimeout(() => {
+        checkGameStatus()
+      }, 1000)
     } catch (error) {
       console.error("Error starting game:", error)
       toast.dismiss(loadingToast)
