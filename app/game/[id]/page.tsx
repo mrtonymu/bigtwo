@@ -21,6 +21,7 @@ export default function GamePage() {
   const [gameStatus, setGameStatus] = useState<"loading" | "waiting" | "ready" | "not-found">("loading")
   const [playerCount, setPlayerCount] = useState(0)
   const [players, setPlayers] = useState<any[]>([])
+  const [isHost, setIsHost] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -66,6 +67,12 @@ export default function GamePage() {
       const currentPlayerCount = playersData?.length || 0
       setPlayerCount(currentPlayerCount)
       setPlayers(playersData || [])
+
+      // Check if current player is the host (first player or creator)
+      const isCurrentPlayerHost = playersData?.some(player => 
+        player.player_name === playerName && player.position === 0
+      ) || false
+      setIsHost(isCurrentPlayerHost)
 
       // Check if game is already in progress
       if (gameData.status === "in-progress") {
@@ -201,10 +208,15 @@ export default function GamePage() {
             </div>
 
             <div className="space-y-3">
-              {playerCount >= 2 && !isSpectator && (
+              {playerCount >= 2 && !isSpectator && isHost && (
                 <Button onClick={startGame} className="w-full">
                   Start Game ({playerCount} players)
                 </Button>
+              )}
+              {playerCount >= 2 && !isSpectator && !isHost && (
+                <div className="text-sm text-gray-500 text-center py-2">
+                  等待Host开始游戏...
+                </div>
               )}
               <Button variant="outline" asChild className="w-full bg-transparent">
                 <Link href="/">Back to Lobby</Link>

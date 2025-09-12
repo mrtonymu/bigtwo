@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { type Card as GameCard, type Player, type GameState, isValidPlay, createDeck, dealCards, sortCards, autoArrangeCards } from "@/lib/game-logic"
 import { Button } from "@/components/ui/button"
@@ -48,7 +48,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
   })
 
   // 获取游戏数据
-  const fetchGameData = async () => {
+  const fetchGameData = useCallback(async () => {
     try {
       setIsLoading(true)
       
@@ -71,23 +71,6 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       const playersData = playersResult.data || []
       const gameStateData = gameStateResult.data
 
-      // 如果游戏状态不存在，说明游戏还没开始
-      if (gameStateResult.error && gameStateResult.error.code === 'PGRST116') {
-        console.log("Game state not found, game not started yet")
-        setGameState(null)
-        setPlayers(playersData.map((p) => ({
-          id: p.id,
-          name: p.player_name,
-          position: p.position,
-          cards: p.cards || [],
-          isSpectator: p.is_spectator,
-        })))
-        setIsLoading(false)
-        return
-      }
-
-      if (gameStateResult.error) throw gameStateResult.error
-
       // 转换玩家数据格式
       const playersList = playersData.map((p) => ({
         id: p.id,
@@ -97,7 +80,33 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
         isSpectator: p.is_spectator,
       }))
 
-      setPlayers(playersList)
+      // 如果游戏状态不存在，说明游戏还没开始
+      if (gameStateResult.error && gameStateResult.error.code === 'PGRST116') {
+        console.log("Game state not found, game not started yet")
+        setGameState(null)
+        setPlayers(playersList)
+        setIsLoading(false)
+        return
+      }
+
+      if (gameStateResult.error) throw gameStateResult.error
+
+      // 批量更新状态，避免多次渲染
+      const newState = {
+        players: playersList,
+        gameState: gameStateData ? {
+          id: gameStateData.id,
+          currentPlayer: gameStateData.current_player,
+          lastPlay: gameStateData.last_play || [],
+          lastPlayer: gameStateData.last_player,
+          turnCount: gameStateData.turn_count,
+        } : null
+      }
+
+      setPlayers(newState.players)
+      if (newState.gameState) {
+        setGameState(newState.gameState)
+      }
 
       // 检查获胜者
       const winner = playersList.find((p) => p.cards.length === 0)
@@ -105,16 +114,6 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
         setGameWinner(winner.name)
         // Update game status to finished
         await supabase.from("games").update({ status: "finished" }).eq("id", gameId)
-      }
-
-      if (gameStateData) {
-        setGameState({
-          id: gameStateData.id,
-          currentPlayer: gameStateData.current_player,
-          lastPlay: gameStateData.last_play || [],
-          lastPlayer: gameStateData.last_player,
-          turnCount: gameStateData.turn_count,
-        })
       }
 
       // 找到当前玩家的位置和手牌
@@ -136,11 +135,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       toast.error("获取游戏数据失败")
       setIsLoading(false)
     }
-  }
-
-  useEffect(() => {
-    fetchGameData()
-  }, [gameId, playerName])
+  }, [gameId, playerName, gameOptions, gameWinner, supabase])
 
   useEffect(() => {
     // Subscribe to game updates
@@ -156,12 +151,13 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       )
       .subscribe()
 
+    // Initial data fetch
     fetchGameData()
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [gameId])
+  }, [gameId, playerName])
 
 
   const handleCardClick = (card: GameCard) => {
