@@ -52,6 +52,72 @@ export function shuffleDeck(deck: Card[]): Card[] {
   return shuffled
 }
 
+// Sort cards by suit and rank
+export function sortCards(cards: Card[], sortBy: "suit" | "rank" | "auto" = "auto"): Card[] {
+  const sorted = [...cards]
+  
+  if (sortBy === "suit") {
+    // Sort by suit first, then by rank
+    return sorted.sort((a, b) => {
+      const suitOrder = { spades: 0, hearts: 1, diamonds: 2, clubs: 3 }
+      if (suitOrder[a.suit] !== suitOrder[b.suit]) {
+        return suitOrder[a.suit] - suitOrder[b.suit]
+      }
+      return a.rank - b.rank
+    })
+  } else if (sortBy === "rank") {
+    // Sort by rank first, then by suit
+    return sorted.sort((a, b) => {
+      if (a.rank !== b.rank) {
+        return a.rank - b.rank
+      }
+      const suitOrder = { spades: 0, hearts: 1, diamonds: 2, clubs: 3 }
+      return suitOrder[a.suit] - suitOrder[b.suit]
+    })
+  } else {
+    // Auto sort: group by suit, then sort by rank within each suit
+    return sorted.sort((a, b) => {
+      const suitOrder = { spades: 0, hearts: 1, diamonds: 2, clubs: 3 }
+      if (suitOrder[a.suit] !== suitOrder[b.suit]) {
+        return suitOrder[a.suit] - suitOrder[b.suit]
+      }
+      return a.rank - b.rank
+    })
+  }
+}
+
+// Auto arrange cards by grouping similar cards together
+export function autoArrangeCards(cards: Card[]): Card[] {
+  const sorted = [...cards]
+  
+  // Group cards by suit
+  const suitGroups: { [key: string]: Card[] } = {
+    spades: [],
+    hearts: [],
+    diamonds: [],
+    clubs: []
+  }
+  
+  sorted.forEach(card => {
+    suitGroups[card.suit].push(card)
+  })
+  
+  // Sort each suit group by rank
+  Object.keys(suitGroups).forEach(suit => {
+    suitGroups[suit].sort((a, b) => a.rank - b.rank)
+  })
+  
+  // Combine groups in order: spades, hearts, diamonds, clubs
+  const result: Card[] = []
+  const suitOrder = ["spades", "hearts", "diamonds", "clubs"] as const
+  
+  suitOrder.forEach(suit => {
+    result.push(...suitGroups[suit])
+  })
+  
+  return result
+}
+
 // Deal cards to players
 export function dealCards(deck: Card[], numPlayers: number): Card[][] {
   const hands: Card[][] = Array(numPlayers)

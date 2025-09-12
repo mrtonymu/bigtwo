@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { type Card as GameCard, type Player, type GameState, isValidPlay, createDeck, dealCards } from "@/lib/game-logic"
+import { type Card as GameCard, type Player, type GameState, isValidPlay, createDeck, dealCards, sortCards, autoArrangeCards } from "@/lib/game-logic"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -32,6 +32,8 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
     gameSpeed: "normal",
     autoPass: false,
     showCardCount: true,
+    cardSorting: "auto",
+    autoArrange: true,
   })
   const supabase = createClient()
 
@@ -119,7 +121,13 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       const myPlayer = playersData.find(p => p.player_name === playerName)
       if (myPlayer) {
         setMyPosition(myPlayer.position)
-        setMyCards(myPlayer.cards || [])
+        let sortedCards = myPlayer.cards || []
+        if (gameOptions.autoArrange) {
+          sortedCards = autoArrangeCards(sortedCards)
+        } else {
+          sortedCards = sortCards(sortedCards, gameOptions.cardSorting)
+        }
+        setMyCards(sortedCards)
       }
 
       setIsLoading(false)
@@ -458,7 +466,35 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-center">Your Cards ({myCards.length})</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-center flex-1">Your Cards ({myCards.length})</CardTitle>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const sorted = sortCards(myCards, gameOptions.cardSorting)
+                    setMyCards(sorted)
+                    toast.success("手牌已排序")
+                  }}
+                  className="text-xs"
+                >
+                  🔄 排序
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const arranged = autoArrangeCards(myCards)
+                    setMyCards(arranged)
+                    toast.success("手牌已自动整理")
+                  }}
+                  className="text-xs"
+                >
+                  🎯 整理
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap justify-center gap-2 mb-6">

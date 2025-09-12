@@ -18,6 +18,8 @@ export interface GameOptions {
   gameSpeed: "slow" | "normal" | "fast"
   autoPass: boolean
   showCardCount: boolean
+  cardSorting: "auto" | "suit" | "rank"
+  autoArrange: boolean
 }
 
 export function GameOptions({ isOpen, onClose, onSave }: GameOptionsProps) {
@@ -26,6 +28,8 @@ export function GameOptions({ isOpen, onClose, onSave }: GameOptionsProps) {
     gameSpeed: "normal",
     autoPass: false,
     showCardCount: true,
+    cardSorting: "auto",
+    autoArrange: true,
   })
 
   if (!isOpen) return null
@@ -83,6 +87,32 @@ export function GameOptions({ isOpen, onClose, onSave }: GameOptionsProps) {
               id="cardcount"
               checked={options.showCardCount}
               onCheckedChange={(checked) => setOptions({ ...options, showCardCount: checked })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Card Sorting</Label>
+            <Select
+              value={options.cardSorting}
+              onValueChange={(value: "auto" | "suit" | "rank") => setOptions({ ...options, cardSorting: value })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">Auto (按花色分组)</SelectItem>
+                <SelectItem value="suit">By Suit (按花色排序)</SelectItem>
+                <SelectItem value="rank">By Rank (按点数排序)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <Label htmlFor="autoarrange">Auto Arrange Cards</Label>
+            <Switch
+              id="autoarrange"
+              checked={options.autoArrange}
+              onCheckedChange={(checked) => setOptions({ ...options, autoArrange: checked })}
             />
           </div>
 
