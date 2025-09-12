@@ -172,6 +172,7 @@ export function isValidCombination(cards: Card[]): boolean {
   if (cards.length === 2) return isPair(cards) // Pair
   if (cards.length === 3) return isThreeOfAKind(cards) // Three of a kind
   if (cards.length === 5) return isFiveCardHand(cards) // Five card hand
+  if (cards.length === 6) return isFourOfAKindPlusOne(cards) // Four of a kind + single (金刚)
   return false // Invalid length
 }
 
@@ -183,6 +184,21 @@ function isPair(cards: Card[]): boolean {
 // Check if three cards form three of a kind
 function isThreeOfAKind(cards: Card[]): boolean {
   return cards.length === 3 && cards[0].rank === cards[1].rank && cards[1].rank === cards[2].rank
+}
+
+// Check if six cards form four of a kind plus one (金刚)
+function isFourOfAKindPlusOne(cards: Card[]): boolean {
+  if (cards.length !== 6) return false
+  
+  const ranks = cards.map(c => c.rank)
+  const rankCounts = ranks.reduce((acc, rank) => {
+    acc[rank] = (acc[rank] || 0) + 1
+    return acc
+  }, {} as Record<number, number>)
+  
+  const counts = Object.values(rankCounts).sort()
+  // Should have one rank with 4 cards and one rank with 1 card
+  return counts.length === 2 && counts[0] === 1 && counts[1] === 4
 }
 
 // Check if five cards form a valid hand (straight, flush, etc.)
@@ -228,6 +244,13 @@ function isHigherCombination(cardsA: Card[], cardsB: Card[]): boolean {
     return maxA > maxB
   }
 
+  if (cardsA.length === 6) {
+    // For four of a kind + one (金刚), compare by four of a kind rank
+    const fourOfAKindA = getFourOfAKindRank(cardsA)
+    const fourOfAKindB = getFourOfAKindRank(cardsB)
+    return fourOfAKindA > fourOfAKindB
+  }
+
   // For five card hands, compare by type first, then by highest card
   return getHandValue(cardsA) > getHandValue(cardsB)
 }
@@ -237,6 +260,24 @@ function getCardValue(card: Card): number {
   // Suit order: hearts < diamonds < clubs < spades
   const suitValue = ["hearts", "diamonds", "clubs", "spades"].indexOf(card.suit)
   return card.rank * 4 + suitValue
+}
+
+// Get the rank of four of a kind in a six-card hand (金刚)
+function getFourOfAKindRank(cards: Card[]): number {
+  const ranks = cards.map(c => c.rank)
+  const rankCounts = ranks.reduce((acc, rank) => {
+    acc[rank] = (acc[rank] || 0) + 1
+    return acc
+  }, {} as Record<number, number>)
+  
+  // Find the rank that appears 4 times
+  for (const [rank, count] of Object.entries(rankCounts)) {
+    if (count === 4) {
+      return Number(rank)
+    }
+  }
+  
+  return 0 // Should not happen if cards form valid four of a kind + one
 }
 
 // Get hand value for five card combinations
