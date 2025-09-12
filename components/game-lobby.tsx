@@ -104,6 +104,13 @@ export function GameLobby() {
             >
               {isCreating ? "创建中..." : "创建观影房间"}
             </Button>
+            <Button
+              onClick={() => window.location.href = '/werewolf'}
+              className="w-full bg-red-600 hover:bg-red-700 text-white"
+              size="lg"
+            >
+              🐺 狼人杀游戏
+            </Button>
             <button
               onClick={() => setShowOptions(true)}
               className="w-full text-sm text-gray-600 hover:text-gray-800 underline"
