@@ -12,8 +12,8 @@ export function AppWrapper({ children }: AppWrapperProps) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Check if user is already authenticated
-    const isAuth = sessionStorage.getItem("cnflix_authenticated")
+    // Check if user is already authenticated (permanent)
+    const isAuth = localStorage.getItem("cnflix_authenticated")
     if (isAuth === "true") {
       setIsAuthenticated(true)
     }

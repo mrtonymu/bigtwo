@@ -19,8 +19,8 @@ export function PasswordProtection({ onPasswordCorrect }: PasswordProtectionProp
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   useEffect(() => {
-    // Check if user is already authenticated in this session
-    const isAuth = sessionStorage.getItem("cnflix_authenticated")
+    // Check if user is already authenticated (permanent)
+    const isAuth = localStorage.getItem("cnflix_authenticated")
     if (isAuth === "true") {
       setIsAuthenticated(true)
       onPasswordCorrect()
@@ -36,7 +36,7 @@ export function PasswordProtection({ onPasswordCorrect }: PasswordProtectionProp
 
     if (password === CORRECT_PASSWORD) {
       setIsAuthenticated(true)
-      sessionStorage.setItem("cnflix_authenticated", "true")
+      localStorage.setItem("cnflix_authenticated", "true")
       toast.success("密码正确！欢迎来到CNFLIX！")
       onPasswordCorrect()
     } else {
