@@ -171,8 +171,7 @@ export function isValidCombination(cards: Card[]): boolean {
   if (cards.length === 1) return true // Single card
   if (cards.length === 2) return isPair(cards) // Pair
   if (cards.length === 3) return isThreeOfAKind(cards) // Three of a kind
-  if (cards.length === 5) return isFiveCardHand(cards) // Five card hand
-  if (cards.length === 6) return isFourOfAKindPlusOne(cards) // Four of a kind + single (金刚)
+  if (cards.length === 5) return isFiveCardHand(cards) // Five card hand (includes 金刚)
   return false // Invalid length
 }
 
@@ -186,22 +185,8 @@ function isThreeOfAKind(cards: Card[]): boolean {
   return cards.length === 3 && cards[0].rank === cards[1].rank && cards[1].rank === cards[2].rank
 }
 
-// Check if six cards form four of a kind plus one (金刚)
-function isFourOfAKindPlusOne(cards: Card[]): boolean {
-  if (cards.length !== 6) return false
-  
-  const ranks = cards.map(c => c.rank)
-  const rankCounts = ranks.reduce((acc, rank) => {
-    acc[rank] = (acc[rank] || 0) + 1
-    return acc
-  }, {} as Record<number, number>)
-  
-  const counts = Object.values(rankCounts).sort()
-  // Should have one rank with 4 cards and one rank with 1 card
-  return counts.length === 2 && counts[0] === 1 && counts[1] === 4
-}
 
-// Check if five cards form a valid hand (straight, flush, etc.)
+// Check if five cards form a valid hand (straight, flush, full house, four of a kind + one)
 function isFiveCardHand(cards: Card[]): boolean {
   const sorted = [...cards].sort((a, b) => a.rank - b.rank)
 
@@ -223,7 +208,10 @@ function isFiveCardHand(cards: Card[]): boolean {
   const counts = Object.values(rankCounts).sort()
   const isFullHouse = counts.length === 2 && counts[0] === 2 && counts[1] === 3
 
-  return isStraight || isFlush || isFullHouse
+  // Check for four of a kind + one (金刚)
+  const isFourOfAKindPlusOne = counts.length === 2 && counts[0] === 1 && counts[1] === 4
+
+  return isStraight || isFlush || isFullHouse || isFourOfAKindPlusOne
 }
 
 // Check if combination A is higher than combination B
@@ -244,13 +232,6 @@ function isHigherCombination(cardsA: Card[], cardsB: Card[]): boolean {
     return maxA > maxB
   }
 
-  if (cardsA.length === 6) {
-    // For four of a kind + one (金刚), compare by four of a kind rank
-    const fourOfAKindA = getFourOfAKindRank(cardsA)
-    const fourOfAKindB = getFourOfAKindRank(cardsB)
-    return fourOfAKindA > fourOfAKindB
-  }
-
   // For five card hands, compare by type first, then by highest card
   return getHandValue(cardsA) > getHandValue(cardsB)
 }
@@ -262,23 +243,6 @@ function getCardValue(card: Card): number {
   return card.rank * 4 + suitValue
 }
 
-// Get the rank of four of a kind in a six-card hand (金刚)
-function getFourOfAKindRank(cards: Card[]): number {
-  const ranks = cards.map(c => c.rank)
-  const rankCounts = ranks.reduce((acc, rank) => {
-    acc[rank] = (acc[rank] || 0) + 1
-    return acc
-  }, {} as Record<number, number>)
-  
-  // Find the rank that appears 4 times
-  for (const [rank, count] of Object.entries(rankCounts)) {
-    if (count === 4) {
-      return Number(rank)
-    }
-  }
-  
-  return 0 // Should not happen if cards form valid four of a kind + one
-}
 
 // Get hand value for five card combinations
 function getHandValue(cards: Card[]): number {
@@ -290,7 +254,7 @@ function getHandValue(cards: Card[]): number {
   if (isFlush) return 5000 + sorted[4].rank // Flush
   if (isStraight) return 4000 + sorted[4].rank // Straight
 
-  // Full house - return based on triple rank
+  // Check for four of a kind + one (金刚) and full house
   const ranks = sorted.map((c) => c.rank)
   const rankCounts = ranks.reduce(
     (acc, rank) => {
@@ -300,6 +264,15 @@ function getHandValue(cards: Card[]): number {
     {} as Record<number, number>,
   )
 
+  const counts = Object.values(rankCounts).sort()
+  
+  // Four of a kind + one (金刚)
+  if (counts.length === 2 && counts[0] === 1 && counts[1] === 4) {
+    const fourOfAKindRank = Object.keys(rankCounts).find((rank) => rankCounts[Number(rank)] === 4)
+    return 7000 + Number(fourOfAKindRank) // Four of a kind + one (金刚)
+  }
+
+  // Full house
   const tripleRank = Object.keys(rankCounts).find((rank) => rankCounts[Number(rank)] === 3)
   if (tripleRank) return 6000 + Number(tripleRank) // Full house
 
