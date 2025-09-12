@@ -188,9 +188,18 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
     if (!gameState || selectedCards.length === 0) return
 
     try {
+      // Calculate remaining cards after this play
+      const remainingCards = myCards.filter(
+        (card) => !selectedCards.some((selected) => selected.suit === card.suit && selected.rank === card.rank),
+      )
+
       // Validate play
-      if (!isValidPlay(selectedCards, gameState.lastPlay)) {
-        toast.error("出牌无效！请选择有效的牌型")
+      if (!isValidPlay(selectedCards, gameState.lastPlay, players.length, remainingCards)) {
+        if (remainingCards.length === 1 && remainingCards[0].suit === "spades") {
+          toast.error("不能留下单张♠作为最后一张牌！")
+        } else {
+          toast.error("出牌无效！请选择有效的牌型")
+        }
         return
       }
 

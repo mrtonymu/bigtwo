@@ -148,11 +148,16 @@ export function dealCards(deck: Card[], numPlayers: number): Card[][] {
 }
 
 // Validate if a play is legal
-export function isValidPlay(cards: Card[], lastPlay: Card[]): boolean {
+export function isValidPlay(cards: Card[], lastPlay: Card[], playerCount: number = 4, remainingCards: Card[] = []): boolean {
   if (cards.length === 0) return false
 
   // First play of the game
   if (lastPlay.length === 0) {
+    // For 2-3 players, must start with ♦3
+    if (playerCount < 4) {
+      return isValidCombination(cards) && hasDiamond3(cards)
+    }
+    // For 4 players, can start with any valid combination
     return isValidCombination(cards)
   }
 
@@ -161,6 +166,11 @@ export function isValidPlay(cards: Card[], lastPlay: Card[]): boolean {
 
   // Must be valid combination
   if (!isValidCombination(cards)) return false
+
+  // Check spades rule: can't leave single spade as last card
+  if (remainingCards.length === 1 && remainingCards[0].suit === "spades") {
+    return false
+  }
 
   // Must be higher than last play
   return isHigherCombination(cards, lastPlay)
@@ -183,6 +193,11 @@ function isPair(cards: Card[]): boolean {
 // Check if three cards form three of a kind
 function isThreeOfAKind(cards: Card[]): boolean {
   return cards.length === 3 && cards[0].rank === cards[1].rank && cards[1].rank === cards[2].rank
+}
+
+// Check if cards contain ♦3 (for 2-3 player games)
+function hasDiamond3(cards: Card[]): boolean {
+  return cards.some(card => card.suit === "diamonds" && card.rank === 3)
 }
 
 

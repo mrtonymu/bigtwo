@@ -66,7 +66,11 @@ export default function GamePage() {
       setPlayerCount(currentPlayerCount)
       setPlayers(playersData || [])
 
-      if (gameData.status === "in-progress" || currentPlayerCount >= 4) {
+      // For 2-3 players, need at least 2 players to start
+      // For 4 players, need exactly 4 players to start
+      if (gameData.status === "in-progress") {
+        setGameStatus("ready")
+      } else if (currentPlayerCount >= 2 && currentPlayerCount <= 4) {
         setGameStatus("ready")
       } else {
         setGameStatus("waiting")
@@ -173,6 +177,12 @@ export default function GamePage() {
 
             <h2 className="text-xl font-semibold mb-4">Waiting for Players</h2>
             <p className="text-gray-600 mb-6">Players: {playerCount}/4</p>
+            
+            <div className="text-sm text-gray-500 mb-4">
+              {playerCount < 2 ? "需要至少2名玩家开始游戏" : 
+               playerCount < 4 ? "可以开始游戏（2-3人模式：需要从♦3开始）" : 
+               "可以开始游戏（4人模式：可以任意组合开始）"}
+            </div>
 
             <div className="mb-6">
               <h3 className="font-medium mb-2">Current Players:</h3>
