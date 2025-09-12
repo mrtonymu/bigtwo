@@ -67,13 +67,11 @@ export default function GamePage() {
       setPlayerCount(currentPlayerCount)
       setPlayers(playersData || [])
 
-      // For 2-3 players, need at least 2 players to start
-      // For 4 players, need exactly 4 players to start
+      // Check if game is already in progress
       if (gameData.status === "in-progress") {
         setGameStatus("ready")
-      } else if (currentPlayerCount >= 2 && currentPlayerCount <= 4) {
-        setGameStatus("ready")
       } else {
+        // Always show waiting status, let users choose when to start
         setGameStatus("waiting")
       }
     } catch (error) {
@@ -128,7 +126,7 @@ export default function GamePage() {
       }
       
       toast.dismiss(loadingToast)
-      toast.success("游戏开始！")
+      toast.success("游戏开始！正在自动发牌...")
       setGameStatus("ready")
       
       // 刷新游戏状态，确保所有玩家都能看到更新
@@ -184,6 +182,12 @@ export default function GamePage() {
                playerCount < 4 ? "可以开始游戏（2-3人模式：需要从♦3开始）" : 
                "可以开始游戏（4人模式：可以任意组合开始）"}
             </div>
+            
+            {playerCount >= 4 && (
+              <div className="text-sm text-blue-600 mb-4 font-medium">
+                🎉 房间已满！Host可以选择开始游戏
+              </div>
+            )}
 
             <div className="mb-6">
               <h3 className="font-medium mb-2">Current Players:</h3>

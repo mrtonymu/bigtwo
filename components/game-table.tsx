@@ -333,6 +333,30 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
     return <GameTableSkeleton />
   }
 
+  // Show game start message if game just started
+  if (gameState && gameState.turnCount === 0 && myCards.length > 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="w-full max-w-md mx-4">
+          <CardContent className="text-center p-8">
+            <div className="text-6xl mb-4">🎮</div>
+            <h1 className="text-2xl font-bold mb-4">游戏开始！</h1>
+            <p className="text-gray-600 mb-6">手牌已自动发牌，准备开始游戏！</p>
+            <div className="text-sm text-gray-500 mb-6">
+              {players.length < 4 ? "2-3人模式：需要从♦3开始" : "4人模式：可以任意组合开始"}
+            </div>
+            <Button 
+              onClick={() => window.location.reload()} 
+              className="w-full"
+            >
+              进入游戏
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   // Show winner screen
   if (gameWinner) {
     return (
