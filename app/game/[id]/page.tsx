@@ -151,6 +151,35 @@ export default function GamePage() {
     }
   }
 
+  const endGame = async () => {
+    const loadingToast = toast.loading("正在结束游戏...")
+    
+    try {
+      // Update game status to finished
+      const { error: updateGameError } = await supabase
+        .from("games")
+        .update({ status: "finished" })
+        .eq("id", gameId)
+      
+      if (updateGameError) {
+        console.error("Error ending game:", updateGameError)
+        throw updateGameError
+      }
+      
+      toast.dismiss(loadingToast)
+      toast.success("游戏已结束")
+      
+      // Refresh game status
+      setTimeout(() => {
+        checkGameStatus()
+      }, 1000)
+    } catch (error) {
+      console.error("Error ending game:", error)
+      toast.dismiss(loadingToast)
+      toast.error("结束游戏失败，请重试")
+    }
+  }
+
   if (gameStatus === "loading") {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -222,6 +251,21 @@ export default function GamePage() {
                   等待Host开始游戏...
                 </div>
               )}
+              
+              {/* Host control buttons */}
+              {isHost && (
+                <div className="space-y-2">
+                  <Button 
+                    onClick={endGame} 
+                    variant="destructive" 
+                    className="w-full"
+                    disabled={gameStatus === "loading"}
+                  >
+                    🏁 结束游戏
+                  </Button>
+                </div>
+              )}
+              
               <Button variant="outline" asChild className="w-full bg-transparent">
                 <Link href="/">Back to Lobby</Link>
               </Button>

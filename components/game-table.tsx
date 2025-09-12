@@ -36,6 +36,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
     autoArrange: true,
   })
   const [showGameStart, setShowGameStart] = useState(false)
+  const [isHost, setIsHost] = useState(false)
   const supabase = createClient()
 
   // 重连功能
@@ -121,6 +122,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       const myPlayer = playersData.find(p => p.player_name === playerName)
       if (myPlayer) {
         setMyPosition(myPlayer.position)
+        setIsHost(myPlayer.position === 0) // Host is player with position 0
         let sortedCards = myPlayer.cards || []
         if (gameOptions.autoArrange) {
           sortedCards = autoArrangeCards(sortedCards)
@@ -321,6 +323,33 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       console.error("Error starting new game:", error)
       toast.dismiss(loadingToast)
       toast.error("开始新游戏失败，请重试")
+    }
+  }
+
+  const endGame = async () => {
+    const loadingToast = toast.loading("正在结束游戏...")
+    
+    try {
+      // Update game status to finished
+      const { error: updateGameError } = await supabase
+        .from("games")
+        .update({ status: "finished" })
+        .eq("id", gameId)
+      
+      if (updateGameError) {
+        console.error("Error ending game:", updateGameError)
+        throw updateGameError
+      }
+      
+      toast.dismiss(loadingToast)
+      toast.success("游戏已结束")
+      
+      // Refresh game data
+      await fetchGameData()
+    } catch (error) {
+      console.error("Error ending game:", error)
+      toast.dismiss(loadingToast)
+      toast.error("结束游戏失败，请重试")
     }
   }
 
@@ -591,6 +620,28 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
                 <Badge variant="secondary" className="px-4 py-2 status-change">
                   Waiting for other players...
                 </Badge>
+              </div>
+            )}
+
+            {/* Host control buttons */}
+            {isHost && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <div className="flex justify-center gap-3">
+                  <Button 
+                    onClick={startNewGame} 
+                    variant="outline" 
+                    className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+                  >
+                    🔄 重启游戏
+                  </Button>
+                  <Button 
+                    onClick={endGame} 
+                    variant="destructive" 
+                    className="px-4 py-2"
+                  >
+                    🏁 结束游戏
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>
