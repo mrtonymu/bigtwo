@@ -170,6 +170,7 @@ export function isValidPlay(cards: Card[], lastPlay: Card[]): boolean {
 export function isValidCombination(cards: Card[]): boolean {
   if (cards.length === 1) return true // Single card
   if (cards.length === 2) return isPair(cards) // Pair
+  if (cards.length === 3) return isThreeOfAKind(cards) // Three of a kind
   if (cards.length === 5) return isFiveCardHand(cards) // Five card hand
   return false // Invalid length
 }
@@ -177,6 +178,11 @@ export function isValidCombination(cards: Card[]): boolean {
 // Check if two cards form a pair
 function isPair(cards: Card[]): boolean {
   return cards.length === 2 && cards[0].rank === cards[1].rank
+}
+
+// Check if three cards form three of a kind
+function isThreeOfAKind(cards: Card[]): boolean {
+  return cards.length === 3 && cards[0].rank === cards[1].rank && cards[1].rank === cards[2].rank
 }
 
 // Check if five cards form a valid hand (straight, flush, etc.)
@@ -211,6 +217,12 @@ function isHigherCombination(cardsA: Card[], cardsB: Card[]): boolean {
   }
 
   if (cardsA.length === 2) {
+    const maxA = Math.max(...cardsA.map(getCardValue))
+    const maxB = Math.max(...cardsB.map(getCardValue))
+    return maxA > maxB
+  }
+
+  if (cardsA.length === 3) {
     const maxA = Math.max(...cardsA.map(getCardValue))
     const maxB = Math.max(...cardsB.map(getCardValue))
     return maxA > maxB
