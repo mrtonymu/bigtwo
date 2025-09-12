@@ -128,12 +128,12 @@ export function GameBrowser({ playerName }: GameBrowserProps) {
 
       if (playerError) throw playerError
 
-      // Update game player count
+      // Update game player count (don't auto-start, let host decide)
       await supabase
         .from("games")
         .update({
           current_players: nextPosition + 1,
-          status: nextPosition + 1 >= 4 ? "in-progress" : "waiting",
+          status: "waiting", // Always keep as waiting, let host start
         })
         .eq("id", gameId)
 
