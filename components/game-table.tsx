@@ -333,8 +333,21 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
     return <GameTableSkeleton />
   }
 
-  // Show game start message if game just started
-  if (gameState && gameState.turnCount === 0 && myCards.length > 0) {
+  // Show game start message if game just started (only show briefly)
+  const [showGameStart, setShowGameStart] = useState(false)
+  
+  useEffect(() => {
+    if (gameState && gameState.turnCount === 0 && myCards.length > 0) {
+      setShowGameStart(true)
+      // Auto hide after 3 seconds
+      const timer = setTimeout(() => {
+        setShowGameStart(false)
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [gameState, myCards])
+
+  if (showGameStart) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Card className="w-full max-w-md mx-4">
@@ -345,12 +358,9 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
             <div className="text-sm text-gray-500 mb-6">
               {players.length < 4 ? "2-3人模式：需要从♦3开始" : "4人模式：可以任意组合开始"}
             </div>
-            <Button 
-              onClick={() => window.location.reload()} 
-              className="w-full"
-            >
-              进入游戏
-            </Button>
+            <div className="text-xs text-gray-400">
+              3秒后自动进入游戏...
+            </div>
           </CardContent>
         </Card>
       </div>
