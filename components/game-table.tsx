@@ -1073,7 +1073,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
         />
         
         {/* 音效组件 */}
-        <SoundEffects />
+    </div>        <SoundEffects />
       </div>
     </div>
   )
