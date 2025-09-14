@@ -122,6 +122,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
   const [showHints, setShowHints] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [showThemeSelector, setShowThemeSelector] = useState(false)
+  const [isManualSort, setIsManualSort] = useState(false) // 跟踪是否手动排序
   const supabase = createClient()
 
   // 主题控制
@@ -289,13 +290,26 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
         })
         setMyPosition(myPlayer.position)
         setIsHost(myPlayer.position === 0) // Host is player with position 0
-        let sortedCards = myPlayer.cards || []
-        if (gameOptions.autoArrange) {
-          sortedCards = autoArrangeCards(sortedCards)
+        
+        // 只有在非手动排序时才重新排序手牌
+        if (!isManualSort) {
+          let sortedCards = myPlayer.cards || []
+          if (gameOptions.autoArrange) {
+            sortedCards = autoArrangeCards(sortedCards)
+          } else {
+            sortedCards = sortCards(sortedCards, gameOptions.cardSorting)
+          }
+          setMyCards(sortedCards)
         } else {
-          sortedCards = sortCards(sortedCards, gameOptions.cardSorting)
+          // 手动排序时，只更新手牌数量，保持当前顺序
+          setMyCards(prevCards => {
+            // 如果手牌数量发生变化（比如出牌后），则更新
+            if (prevCards.length !== myPlayer.cards?.length) {
+              return myPlayer.cards || []
+            }
+            return prevCards
+          })
         }
-        setMyCards(sortedCards)
         
         // 如果是我的回合，启动计时器
         if (newState.gameState && newState.gameState.currentPlayer === myPlayer.position) {
@@ -384,6 +398,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       if (oldIndex !== -1 && newIndex !== -1) {
         const newCards = arrayMove(myCards, oldIndex, newIndex)
         setMyCards(newCards)
+        setIsManualSort(true) // 标记为手动排序
         
         // 保存新的排序到数据库
         await saveCardsToDatabase(newCards, "手牌重新排序")
@@ -875,6 +890,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
                   onClick={async () => {
                     const sorted = sortCards(myCards, "suit")
                     setMyCards(sorted)
+                    setIsManualSort(true) // 标记为手动排序
                     await saveCardsToDatabase(sorted, "按花色排序")
                   }}
                   className="text-xs"
@@ -887,6 +903,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
                   onClick={async () => {
                     const sorted = sortCards(myCards, "rank")
                     setMyCards(sorted)
+                    setIsManualSort(true) // 标记为手动排序
                     await saveCardsToDatabase(sorted, "按点数排序")
                   }}
                   className="text-xs"
@@ -899,6 +916,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
                   onClick={async () => {
                     const arranged = autoArrangeCards(myCards)
                     setMyCards(arranged)
+                    setIsManualSort(true) // 标记为手动排序
                     await saveCardsToDatabase(arranged, "自动整理")
                   }}
                   className="text-xs"

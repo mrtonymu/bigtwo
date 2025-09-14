@@ -168,7 +168,7 @@ export function isValidPlay(cards: Card[], lastPlay: Card[], playerCount: number
     if (playerCount < 4) {
       return isValidCombination(cards) && hasDiamond3(cards)
     } else {
-      return isValidCombination(cards)
+    return isValidCombination(cards)
     }
   }
 
@@ -215,7 +215,7 @@ function hasDiamond3(cards: Card[]): boolean {
 // Check if five cards form a valid hand (straight, flush, full house, four of a kind + one)
 function isFiveCardHand(cards: Card[]): boolean {
   if (cards.length !== 5) return false
-  
+
   const sorted = [...cards].sort((a, b) => getCardValue(a) - getCardValue(b))
 
   // Check for flush (同花)
@@ -336,7 +336,7 @@ function getHandValue(cards: Card[]): number {
 
   // Check for full house (葫芦)
   if (counts.length === 2 && counts[0] === 2 && counts[1] === 3) {
-    const tripleRank = Object.keys(rankCounts).find((rank) => rankCounts[Number(rank)] === 3)
+  const tripleRank = Object.keys(rankCounts).find((rank) => rankCounts[Number(rank)] === 3)
     return 7000 + getCardValue({ suit: "spades", rank: Number(tripleRank), display: "" }) // Full house
   }
 
