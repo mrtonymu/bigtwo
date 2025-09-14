@@ -12,6 +12,16 @@ export interface GameState {
   lastPlay: Card[]
   lastPlayer?: number
   turnCount: number
+  playHistory?: PlayHistory[]
+}
+
+export interface PlayHistory {
+  turn: number
+  playerName: string
+  playerPosition: number
+  cards: Card[]
+  playType: string
+  timestamp: string
 }
 
 export interface Player {
@@ -344,4 +354,75 @@ function getHandValue(cards: Card[]): number {
 
   // High card
   return getCardValue(sorted[4])
+}
+
+// Get play type name for history
+export function getPlayTypeName(cards: Card[]): string {
+  if (cards.length === 0) return "Pass"
+  if (cards.length === 1) return "单牌"
+  if (cards.length === 2) return "对子"
+  if (cards.length === 3) return "三条"
+  if (cards.length === 5) {
+    if (isStraightFlush(cards)) return "同花顺"
+    if (isFourOfAKindPlusOne(cards)) return "金刚"
+    if (isFullHouse(cards)) return "葫芦"
+    if (isFlush(cards)) return "同花"
+    if (isStraight(cards)) return "顺子"
+  }
+  if (cards.length === 4) return "四条"
+  return "未知"
+}
+
+// Helper functions for play type detection
+function isStraightFlush(cards: Card[]): boolean {
+  if (cards.length !== 5) return false
+  const sorted = [...cards].sort((a, b) => getCardValue(a) - getCardValue(b))
+  const isFlush = cards.every(card => card.suit === cards[0].suit)
+  const ranks = sorted.map(c => c.rank)
+  const isStraight = ranks.every((rank, i) => {
+    if (i === 0) return true
+    return rank === ranks[i - 1] + 1
+  }) || 
+  (ranks[0] === 3 && ranks[1] === 4 && ranks[2] === 5 && ranks[3] === 6 && ranks[4] === 7) ||
+  (ranks[0] === 10 && ranks[1] === 11 && ranks[2] === 12 && ranks[3] === 13 && ranks[4] === 14)
+  return isStraight && isFlush
+}
+
+function isFourOfAKindPlusOne(cards: Card[]): boolean {
+  if (cards.length !== 5) return false
+  const ranks = cards.map(c => c.rank)
+  const rankCounts = ranks.reduce((acc, rank) => {
+    acc[rank] = (acc[rank] || 0) + 1
+    return acc
+  }, {} as Record<number, number>)
+  const counts = Object.values(rankCounts).sort()
+  return counts.length === 2 && counts[0] === 1 && counts[1] === 4
+}
+
+function isFullHouse(cards: Card[]): boolean {
+  if (cards.length !== 5) return false
+  const ranks = cards.map(c => c.rank)
+  const rankCounts = ranks.reduce((acc, rank) => {
+    acc[rank] = (acc[rank] || 0) + 1
+    return acc
+  }, {} as Record<number, number>)
+  const counts = Object.values(rankCounts).sort()
+  return counts.length === 2 && counts[0] === 2 && counts[1] === 3
+}
+
+function isFlush(cards: Card[]): boolean {
+  if (cards.length !== 5) return false
+  return cards.every(card => card.suit === cards[0].suit)
+}
+
+function isStraight(cards: Card[]): boolean {
+  if (cards.length !== 5) return false
+  const sorted = [...cards].sort((a, b) => getCardValue(a) - getCardValue(b))
+  const ranks = sorted.map(c => c.rank)
+  return ranks.every((rank, i) => {
+    if (i === 0) return true
+    return rank === ranks[i - 1] + 1
+  }) || 
+  (ranks[0] === 3 && ranks[1] === 4 && ranks[2] === 5 && ranks[3] === 6 && ranks[4] === 7) ||
+  (ranks[0] === 10 && ranks[1] === 11 && ranks[2] === 12 && ranks[3] === 13 && ranks[4] === 14)
 }

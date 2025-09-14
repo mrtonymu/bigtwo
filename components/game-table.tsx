@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { type Card as GameCard, type Player, type GameState, isValidPlay, createDeck, dealCards, sortCards, autoArrangeCards } from "@/lib/game-logic"
+import { type Card as GameCard, type Player, type GameState, type PlayHistory, isValidPlay, createDeck, dealCards, sortCards, autoArrangeCards, getPlayTypeName } from "@/lib/game-logic"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,6 +12,7 @@ import toast from "react-hot-toast"
 import { useReconnect } from "@/hooks/use-reconnect"
 import { GameTableSkeleton } from "@/components/game-room-skeleton"
 import { CNFLIXLogo } from "@/components/cnflix-logo"
+import { useSoundEffects } from "@/components/sound-effects"
 import {
   DndContext,
   closestCenter,
@@ -112,7 +113,12 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
   })
   const [showGameStart, setShowGameStart] = useState(false)
   const [isHost, setIsHost] = useState(false)
+  const [turnTimer, setTurnTimer] = useState<number | null>(null)
+  const [timeRemaining, setTimeRemaining] = useState<number>(0)
   const supabase = createClient()
+
+  // 音效控制
+  const { triggerCardSound, triggerWinSound, toggleBackgroundMusic, backgroundMusic, SoundEffects } = useSoundEffects()
 
   // 拖拽传感器
   const sensors = useSensors(
@@ -131,6 +137,35 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       toast.error('连接断开，正在尝试重连...')
     }
   })
+
+  // 计时器功能
+  useEffect(() => {
+    if (turnTimer && timeRemaining > 0) {
+      const timer = setTimeout(() => {
+        setTimeRemaining(prev => {
+          if (prev <= 1) {
+            // 时间到，自动跳过
+            handlePass()
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [turnTimer, timeRemaining])
+
+  // 开始计时器
+  const startTurnTimer = (seconds: number = 30) => {
+    setTimeRemaining(seconds)
+    setTurnTimer(Date.now())
+  }
+
+  // 停止计时器
+  const stopTurnTimer = () => {
+    setTurnTimer(null)
+    setTimeRemaining(0)
+  }
 
   // 获取游戏数据
   const fetchGameData = useCallback(async () => {
@@ -208,6 +243,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       const winner = playersList.find((p: any) => p.cards.length === 0)
       if (winner && !gameWinner) {
         setGameWinner(winner.name)
+        triggerWinSound() // 播放获胜音效
         // Update game status to finished
         // @ts-ignore
         await supabase.from("games").update({ status: "finished" }).eq("id", gameId)
@@ -230,6 +266,13 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
           sortedCards = sortCards(sortedCards, gameOptions.cardSorting)
         }
         setMyCards(sortedCards)
+        
+        // 如果是我的回合，启动计时器
+        if (newState.gameState && newState.gameState.currentPlayer === myPlayer.position) {
+          startTurnTimer(30) // 30秒出牌时间
+        } else {
+          stopTurnTimer()
+        }
       } else {
         console.log('My player not found:', {
           playerName,
@@ -375,8 +418,21 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
         return
       }
 
-      // Update game state
+      // Update game state with history
       const nextPlayer = (gameState.currentPlayer + 1) % players.length
+      const playHistory = gameState.playHistory || []
+      const newPlayHistory = [
+        ...playHistory,
+        {
+          turn: gameState.turnCount + 1,
+          playerName: playerName,
+          playerPosition: myPosition,
+          cards: selectedCards,
+          playType: getPlayTypeName(selectedCards),
+          timestamp: new Date().toISOString(),
+        }
+      ]
+      
       // @ts-ignore
       const { error: gameStateError } = await supabase
         .from("game_state")
@@ -386,6 +442,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
           last_play: selectedCards,
           last_player: myPosition,
           turn_count: gameState.turnCount + 1,
+          play_history: newPlayHistory,
           updated_at: new Date().toISOString(),
         })
         .eq("game_id", gameId)
@@ -397,6 +454,8 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       }
 
       setSelectedCards([])
+      stopTurnTimer() // 停止计时器
+      triggerCardSound() // 播放出牌音效
       toast.success("出牌成功！")
     } catch (error) {
       console.error("Error playing cards:", error)
@@ -426,6 +485,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
         return
       }
 
+      stopTurnTimer() // 停止计时器
       toast.success("已跳过回合")
     } catch (error) {
       console.error("Error passing turn:", error)
@@ -605,6 +665,18 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
               </Button>
               <CNFLIXLogo size="md" />
             </div>
+            <div className="flex items-center gap-2">
+              <Button onClick={toggleBackgroundMusic} variant="outline" size="sm">
+                {backgroundMusic ? "🔇" : "🎵"}
+              </Button>
+              {timeRemaining > 0 && (
+                <div className="flex items-center gap-2 px-3 py-1 bg-red-100 rounded-full">
+                  <span className="text-sm font-medium text-red-700">
+                    ⏰ {timeRemaining}s
+                  </span>
+                </div>
+              )}
+            </div>
             <div className="flex items-center gap-4">
               {/* 连接状态指示器 */}
               <div className="flex items-center gap-2">
@@ -703,6 +775,51 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
                         {card.suit === "clubs" && "♣"}
                         {card.suit === "spades" && "♠"}
                       </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* 游戏历史记录 */}
+        {gameState?.playHistory && gameState.playHistory.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-center">游戏历史</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="max-h-64 overflow-y-auto space-y-2">
+                {gameState?.playHistory?.slice(-10).reverse().map((play, index) => (
+                  <div 
+                    key={`history-${play.turn}-${index}`}
+                    className="flex items-center justify-between p-2 bg-gray-50 rounded-lg text-sm"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-blue-600">第{play.turn}轮</span>
+                      <span className="text-gray-600">{play.playerName}</span>
+                      <Badge variant="outline" className="text-xs">
+                        {play.playType}
+                      </Badge>
+                    </div>
+                    <div className="flex gap-1">
+                      {play.cards.map((card, cardIndex) => (
+                        <span 
+                          key={`history-card-${cardIndex}`}
+                          className={`text-xs px-1 py-0.5 rounded ${
+                            card.suit === "hearts" || card.suit === "diamonds" 
+                              ? "bg-red-100 text-red-700" 
+                              : "bg-gray-100 text-gray-700"
+                          }`}
+                        >
+                          {card.display}
+                          {card.suit === "hearts" && "♥"}
+                          {card.suit === "diamonds" && "♦"}
+                          {card.suit === "clubs" && "♣"}
+                          {card.suit === "spades" && "♠"}
+                        </span>
+                      ))}
                     </div>
                   </div>
                 ))}
@@ -834,6 +951,9 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       </div>
 
       <GameOptions isOpen={showOptions} onClose={() => setShowOptions(false)} onSave={setGameOptions} />
+      
+      {/* 音效组件 */}
+      <SoundEffects />
     </div>
   )
 }
