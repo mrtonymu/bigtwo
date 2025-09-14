@@ -6,7 +6,11 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
-    "start": "next start"
+    "start": "next start",
+    "css:check": "node scripts/css-compat-checker.js",
+    "css:fix": "npm run css:check && echo '\nCSS修复已生成，请查看 css-compat-fixes-generated.css'",
+    "build:compat": "BROWSERSLIST_ENV=compat npm run build",
+    "build:modern": "BROWSERSLIST_ENV=modern npm run build"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -42,7 +46,6 @@
     "@radix-ui/react-tooltip": "1.1.6",
     "@supabase/supabase-js": "^2.57.4",
     "@vercel/analytics": "1.3.1",
-    "autoprefixer": "^10.4.20",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.0.4",
@@ -72,7 +75,9 @@
     "@types/node": "^22",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "autoprefixer": "^10.4.21",
     "postcss": "^8.5",
+    "postcss-preset-env": "^10.3.1",
     "tailwindcss": "^4.1.9",
     "tw-animate-css": "1.3.3",
     "typescript": "^5"

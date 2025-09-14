@@ -1,0 +1,46 @@
+# 浏览器支持配置
+# 这个文件定义了项目支持的浏览器范围
+
+# 生产环境配置
+[production]
+> 1%
+last 2 versions
+not dead
+Chrome >= 60
+Firefox >= 60
+Safari >= 12
+Edge >= 79
+not IE 11
+not op_mini all
+
+# 开发环境配置
+[development]
+> 0.5%
+last 2 versions
+not dead
+Chrome >= 60
+Firefox >= 60
+Safari >= 12
+Edge >= 79
+not IE 11
+
+# 现代浏览器配置（用于支持最新特性）
+[modern]
+> 2%
+last 1 version
+not dead
+Chrome >= 80
+Firefox >= 78
+Safari >= 14
+Edge >= 88
+
+# 兼容性配置（最大兼容性）
+[compat]
+> 0.25%
+last 3 versions
+not dead
+Chrome >= 58
+Firefox >= 55
+Safari >= 11
+Edge >= 16
+not IE 11

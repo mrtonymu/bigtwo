@@ -373,6 +373,23 @@ export function getPlayTypeName(cards: Card[]): string {
   return "未知"
 }
 
+// Get play strength for comparison
+export function getPlayStrength(cards: Card[]): number {
+  if (cards.length === 0) return 0
+  if (cards.length === 1) return getCardValue(cards[0])
+  if (cards.length === 2) return getCardValue(cards[0]) * 1000 + getCardValue(cards[1])
+  if (cards.length === 3) return getCardValue(cards[0]) * 10000
+  if (cards.length === 5) {
+    if (isStraightFlush(cards)) return getHandValue(cards) + 1000000
+    if (isFourOfAKindPlusOne(cards)) return getHandValue(cards) + 900000
+    if (isFullHouse(cards)) return getHandValue(cards) + 800000
+    if (isFlush(cards)) return getHandValue(cards) + 700000
+    if (isStraight(cards)) return getHandValue(cards) + 600000
+  }
+  if (cards.length === 4) return getCardValue(cards[0]) * 100000
+  return 0
+}
+
 // Helper functions for play type detection
 function isStraightFlush(cards: Card[]): boolean {
   if (cards.length !== 5) return false

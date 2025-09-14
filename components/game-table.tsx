@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { createClient } from "@/lib/supabase/client"
+
 import { type Card as GameCard, type Player, type GameState, type PlayHistory, type CardHint, isValidPlay, createDeck, dealCards, sortCards, autoArrangeCards, getPlayTypeName, getCardHints } from "@/lib/game-logic"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -9,7 +9,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { GameOptions, type GameOptions as GameOptionsType } from "@/components/game-options"
 import Link from "next/link"
 import toast from "react-hot-toast"
+import { useSmartDataSync } from "@/lib/utils/database-optimizer"
+import { useSafeTimer, useSafeSupabaseSubscription } from "@/lib/utils/memory-manager"
 import { useReconnect } from "@/hooks/use-reconnect"
+import { createClient } from "@/lib/supabase/client"
+
 import { GameTableSkeleton } from "@/components/game-room-skeleton"
 import { CNFLIXLogo } from "@/components/cnflix-logo"
 import { useSoundEffects } from "@/components/sound-effects"
@@ -123,7 +127,24 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
   const [showStats, setShowStats] = useState(false)
   const [showThemeSelector, setShowThemeSelector] = useState(false)
   const [isManualSort, setIsManualSort] = useState(false) // 跟踪是否手动排序
+  // 安全的定时器和订阅管理
+  const { setTimeout: safeSetTimeout, clearTimeout: safeClearTimeout } = useSafeTimer()
+  const { addSubscription } = useSafeSupabaseSubscription()
   const supabase = createClient()
+  
+  // 智能数据同步 - 优化手牌保存
+  const { save: saveCardsSmartly } = useSmartDataSync(async (cards: GameCard[]) => {
+    const { error } = await (supabase as any)
+      .from("players")
+      .update({ cards })
+      .eq("game_id", gameId)
+      .eq("player_name", playerName)
+    
+    if (error) {
+      console.error('Error saving cards:', error)
+      throw error
+    }
+  }, 2000) // 2秒防抖
 
   // 主题控制
   const { currentTheme, changeTheme } = useTheme()
@@ -152,10 +173,10 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
     }
   })
 
-  // 计时器功能
+  // 计时器功能 - 使用安全的定时器防止内存泄漏
   useEffect(() => {
     if (turnTimer && timeRemaining > 0) {
-      const timer = setTimeout(() => {
+      const timer = safeSetTimeout(() => {
         setTimeRemaining(prev => {
           if (prev <= 1) {
             // 时间到，自动跳过
@@ -165,9 +186,9 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
           return prev - 1
         })
       }, 1000)
-      return () => clearTimeout(timer)
+      return () => safeClearTimeout(timer)
     }
-  }, [turnTimer, timeRemaining])
+  }, [turnTimer, timeRemaining, safeSetTimeout, safeClearTimeout])
 
   // 开始计时器
   const startTurnTimer = (seconds: number = 30) => {
@@ -336,7 +357,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
   }, [gameId, playerName, gameOptions.autoArrange, gameOptions.cardSorting, gameWinner])
 
   useEffect(() => {
-    // Subscribe to game updates
+    // Subscribe to game updates - 使用安全的订阅管理
     const channel = supabase
       .channel(`game-${gameId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "players", filter: `game_id=eq.${gameId}` }, () =>
@@ -349,33 +370,25 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       )
       .subscribe()
 
+    // 将订阅添加到管理器中
+    addSubscription({
+      unsubscribe: () => supabase.removeChannel(channel)
+    })
+
     // Initial data fetch
     fetchGameData()
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [gameId, playerName, fetchGameData])
+  }, [gameId, playerName, fetchGameData, addSubscription])
 
-  // 保存手牌到数据库的辅助函数
+  // 保存手牌到数据库的辅助函数 - 已被智能同步取代
   const saveCardsToDatabase = async (cards: GameCard[], action: string) => {
     try {
-      // @ts-ignore
-      const { error } = await supabase
-        .from("players")
-        // @ts-ignore
-        .update({ cards: cards })
-        .eq("game_id", gameId)
-        .eq("player_name", playerName)
-      
-      if (error) {
-        console.error(`Error updating cards after ${action}:`, error)
-        toast.error(`保存${action}失败`)
-        return false
-      } else {
-        toast.success(`${action}完成`)
-        return true
-      }
+      saveCardsSmartly(cards) // 使用智能同步，自动防抖和去重
+      toast.success(`${action}完成`)
+      return true
     } catch (error) {
       console.error(`Error saving cards after ${action}:`, error)
       toast.error(`保存${action}失败`)

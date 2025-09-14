@@ -8,7 +8,9 @@ import { GameBrowser } from "@/components/game-browser"
 import { GameOptions, type GameOptions as GameOptionsType } from "@/components/game-options"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
+import { useErrorHandler } from "@/lib/utils/error-handler"
 import toast from "react-hot-toast"
+import { validatePlayerName, validateRoomName, InputSanitizer } from "@/lib/utils/input-validator"
 import { CNFLIXLogo } from "@/components/cnflix-logo"
 
 export function GameLobby() {
@@ -21,53 +23,74 @@ export function GameLobby() {
     gameSpeed: "normal",
     autoPass: false,
     showCardCount: true,
+    cardSorting: "auto",
+    autoArrange: true,
   })
   const supabase = createClient()
+  const { handleSupabaseError } = useErrorHandler()
   const router = useRouter()
 
 
   const handleNewGame = async () => {
-    if (!playerName.trim() || !gameName.trim()) {
-      toast.error("请输入观影者名称和房间名称")
+    // 输入验证
+    const playerNameValidation = validatePlayerName(playerName)
+    const roomNameValidation = validateRoomName(gameName)
+    
+    if (!playerNameValidation.isValid) {
+      handleSupabaseError(new Error(playerNameValidation.errors[0]), "玩家名称验证")
       return
     }
+    
+    if (!roomNameValidation.isValid) {
+      handleSupabaseError(new Error(roomNameValidation.errors[0]), "房间名称验证")
+      return
+    }
+
+    // 清理输入数据
+    const sanitizedPlayerName = InputSanitizer.sanitizePlayerName(playerName)
+    const sanitizedRoomName = InputSanitizer.sanitizeRoomName(gameName)
 
     setIsCreating(true)
     const loadingToast = toast.loading("正在创建观影房间...")
     
     try {
       // Create new game
-      const { data: gameData, error: gameError } = await supabase
+      // 临时使用 any 类型断言，等待 Supabase 类型配置完善
+      const { data: gameData, error: gameError } = await (supabase as any)
         .from("games")
         .insert({
-          name: gameName.trim(),
-          status: "waiting",
+          name: sanitizedRoomName,
+          status: "waiting" as const,
           max_players: 4,
           current_players: 1,
         })
         .select()
         .single()
 
-      if (gameError) throw gameError
+      if (gameError) {
+        handleSupabaseError(gameError, "创建游戏")
+        return
+      }
 
-      const { error: playerError } = await supabase.from("players").insert({
-        game_id: gameData.id,
-        player_name: playerName.trim(),
+      const { error: playerError } = await (supabase as any).from("players").insert({
+        game_id: gameData!.id,
+        player_name: sanitizedPlayerName,
         position: 0,
         is_spectator: false,
       })
 
-      if (playerError) throw playerError
+      if (playerError) {
+        handleSupabaseError(playerError, "添加玩家")
+        return
+      }
 
       toast.dismiss(loadingToast)
       toast.success("观影房间创建成功！")
       
       // Navigate to game
-      router.push(`/game/${gameData.id}?player=${encodeURIComponent(playerName.trim())}`)
+      router.push(`/game/${gameData!.id}?player=${encodeURIComponent(sanitizedPlayerName)}`)
     } catch (error) {
-      console.error("Error creating game:", error)
-      toast.dismiss(loadingToast)
-      toast.error("创建房间失败，请重试")
+      handleSupabaseError(error, "创建房间")
     } finally {
       setIsCreating(false)
     }
