@@ -939,7 +939,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
 
         <div className="max-w-6xl mx-auto p-4">
           {isMyTurn ? (
-              <div className="flex flex-col items-center gap-3">
+            <div className="flex flex-col items-center gap-3">
                 <div className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-3 w-full">
                   <Button 
                     onClick={handlePlay} 
@@ -1055,27 +1055,27 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
               </div>
             )}
         </div>
-      </div>
 
-      <GameOptions isOpen={showOptions} onClose={() => setShowOptions(false)} onSave={setGameOptions} />
-      
-      {/* 游戏统计 */}
-      <GameStats 
-        playerName={playerName} 
-        isOpen={showStats} 
-        onClose={() => setShowStats(false)} 
-      />
-      
-      {/* 主题选择器 */}
-      <ThemeSelector
-        isOpen={showThemeSelector}
-        onClose={() => setShowThemeSelector(false)}
-        currentTheme={currentTheme}
-        onThemeChange={changeTheme}
-      />
-      
-      {/* 音效组件 */}
-      <SoundEffects />
+        <GameOptions isOpen={showOptions} onClose={() => setShowOptions(false)} onSave={setGameOptions} />
+        
+        {/* 游戏统计 */}
+        <GameStats 
+          playerName={playerName} 
+          isOpen={showStats} 
+          onClose={() => setShowStats(false)} 
+        />
+        
+        {/* 主题选择器 */}
+        <ThemeSelector
+          isOpen={showThemeSelector}
+          onClose={() => setShowThemeSelector(false)}
+          currentTheme={currentTheme}
+          onThemeChange={changeTheme}
+        />
+        
+        {/* 音效组件 */}
+        <SoundEffects />
+      </div>
     </div>
   )
 }
