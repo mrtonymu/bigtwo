@@ -934,10 +934,13 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
                 </div>
               </SortableContext>
             </DndContext>
+          </CardContent>
+        </Card>
 
-            {isMyTurn ? (
+        <div className="max-w-6xl mx-auto p-4">
+          {isMyTurn ? (
               <div className="flex flex-col items-center gap-3">
-                <div className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-3 w-full"></div>
+                <div className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-3 w-full">
                   <Button 
                     onClick={handlePlay} 
                     disabled={selectedCards.length === 0} 
@@ -966,7 +969,6 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
                       💡
                     </Button>
                   </div>
-                </div>
                 
                 {/* 出牌提示 */}
                 {showHints && cardHints.length > 0 && (
@@ -1052,8 +1054,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
                 </div>
               </div>
             )}
-          </CardContent>
-        </Card>
+        </div>
       </div>
 
       <GameOptions isOpen={showOptions} onClose={() => setShowOptions(false)} onSave={setGameOptions} />
