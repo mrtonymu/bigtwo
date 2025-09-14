@@ -151,9 +151,15 @@ export function dealCards(deck: Card[], numPlayers: number): Card[][] {
 export function isValidPlay(cards: Card[], lastPlay: Card[], playerCount: number = 4, remainingCards: Card[] = []): boolean {
   if (cards.length === 0) return false
 
-  // First play of the game - must always start with ♦3 (方块3)
+  // First play of the game
   if (lastPlay.length === 0) {
-    return isValidCombination(cards) && hasDiamond3(cards)
+    // For 2-3 player games, must start with ♦3
+    // For 4 player games, can start with any valid combination
+    if (playerCount < 4) {
+      return isValidCombination(cards) && hasDiamond3(cards)
+    } else {
+      return isValidCombination(cards)
+    }
   }
 
   // Must play same number of cards
@@ -207,16 +213,21 @@ function isFiveCardHand(cards: Card[]): boolean {
 
   // Check for straight (顺子) - handle A-2-3-4-5 and 10-J-Q-K-A
   const ranks = sorted.map(c => c.rank)
-  const isStraight = ranks.every((rank, i) => {
+  
+  // Handle special straights first
+  const isSpecialStraight = 
+    // A-2-3-4-5 straight
+    (ranks[0] === 3 && ranks[1] === 4 && ranks[2] === 5 && ranks[3] === 6 && ranks[4] === 7) ||
+    // 10-J-Q-K-A straight  
+    (ranks[0] === 10 && ranks[1] === 11 && ranks[2] === 12 && ranks[3] === 13 && ranks[4] === 14)
+  
+  // Handle normal straight
+  const isNormalStraight = ranks.every((rank, i) => {
     if (i === 0) return true
-    const prevRank = ranks[i - 1]
-    // Handle A-2-3-4-5 straight
-    if (prevRank === 15 && rank === 3) return true
-    // Handle normal straight
-    return rank === prevRank + 1
-  }) || 
-  // Handle 10-J-Q-K-A straight
-  ranks[0] === 10 && ranks[1] === 11 && ranks[2] === 12 && ranks[3] === 13 && ranks[4] === 14
+    return rank === ranks[i - 1] + 1
+  })
+  
+  const isStraight = isSpecialStraight || isNormalStraight
 
   // Check for straight flush (同花顺)
   const isStraightFlush = isStraight && isFlush

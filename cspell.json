@@ -1,0 +1,16 @@
+{
+  "version": "0.2",
+  "language": "en,zh",
+  "words": [
+    "supabase",
+    "CNFLIX",
+    "cnflix",
+    "PGRST"
+  ],
+  "ignoreWords": [
+    "supabase",
+    "CNFLIX", 
+    "cnflix",
+    "PGRST"
+  ]
+}

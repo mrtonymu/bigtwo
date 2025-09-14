@@ -276,9 +276,18 @@ export default function GamePage() {
     )
   }
 
+  if (gameStatus === "ready") {
+    return (
+      <AppWrapper>
+        <GameTable gameId={gameId} playerName={playerName} />
+      </AppWrapper>
+    )
+  }
+
+  // This should not happen, but just in case
   return (
-    <AppWrapper>
-      <GameTable gameId={gameId} playerName={playerName} />
-    </AppWrapper>
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-gray-600 text-xl">Loading...</div>
+    </div>
   )
 }
