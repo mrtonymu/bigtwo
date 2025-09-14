@@ -185,6 +185,32 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
   }, [gameId, playerName, fetchGameData])
 
 
+  // 保存手牌到数据库的辅助函数
+  const saveCardsToDatabase = async (cards: GameCard[], action: string) => {
+    try {
+      // @ts-ignore
+      const { error } = await supabase
+        .from("players")
+        // @ts-ignore
+        .update({ cards: cards })
+        .eq("game_id", gameId)
+        .eq("player_name", playerName)
+      
+      if (error) {
+        console.error(`Error updating cards after ${action}:`, error)
+        toast.error(`保存${action}失败`)
+        return false
+      } else {
+        toast.success(`${action}完成`)
+        return true
+      }
+    } catch (error) {
+      console.error(`Error saving cards after ${action}:`, error)
+      toast.error(`保存${action}失败`)
+      return false
+    }
+  }
+
   const handleCardClick = (card: GameCard) => {
     // 添加点击反馈动画
     const cardElement = document.querySelector(`[data-card-id="${card.suit}-${card.rank}"]`)
@@ -584,26 +610,38 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-center flex-1">Your Cards ({myCards.length})</CardTitle>
-              <div className="flex gap-2">
+              <div className="flex gap-1 flex-wrap">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    const sorted = sortCards(myCards, gameOptions.cardSorting)
+                  onClick={async () => {
+                    const sorted = sortCards(myCards, "suit")
                     setMyCards(sorted)
-                    toast.success("手牌已排序")
+                    await saveCardsToDatabase(sorted, "按花色排序")
                   }}
                   className="text-xs"
                 >
-                  🔄 排序
+                  ♠️ 花色
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
+                  onClick={async () => {
+                    const sorted = sortCards(myCards, "rank")
+                    setMyCards(sorted)
+                    await saveCardsToDatabase(sorted, "按点数排序")
+                  }}
+                  className="text-xs"
+                >
+                  🔢 点数
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
                     const arranged = autoArrangeCards(myCards)
                     setMyCards(arranged)
-                    toast.success("手牌已自动整理")
+                    await saveCardsToDatabase(arranged, "自动整理")
                   }}
                   className="text-xs"
                 >
