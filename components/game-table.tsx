@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { type Card as GameCard, type Player, type GameState, type PlayHistory, isValidPlay, createDeck, dealCards, sortCards, autoArrangeCards, getPlayTypeName } from "@/lib/game-logic"
+import { type Card as GameCard, type Player, type GameState, type PlayHistory, type CardHint, isValidPlay, createDeck, dealCards, sortCards, autoArrangeCards, getPlayTypeName, getCardHints } from "@/lib/game-logic"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,6 +13,8 @@ import { useReconnect } from "@/hooks/use-reconnect"
 import { GameTableSkeleton } from "@/components/game-room-skeleton"
 import { CNFLIXLogo } from "@/components/cnflix-logo"
 import { useSoundEffects } from "@/components/sound-effects"
+import { GameStats } from "@/components/game-stats"
+import { ThemeSelector, useTheme } from "@/components/theme-selector"
 import {
   DndContext,
   closestCenter,
@@ -39,11 +41,12 @@ interface GameTableProps {
 }
 
 // 可拖拽的卡片组件
-function DraggableCard({ card, index, isSelected, onClick }: { 
+function DraggableCard({ card, index, isSelected, onClick, currentTheme }: { 
   card: GameCard, 
   index: number, 
   isSelected: boolean, 
-  onClick: () => void 
+  onClick: () => void,
+  currentTheme: any
 }) {
   const {
     attributes,
@@ -70,10 +73,10 @@ function DraggableCard({ card, index, isSelected, onClick }: {
       key={`${card.suit}-${card.rank}-${index}`}
       data-card-id={`${card.suit}-${card.rank}`}
       onClick={onClick}
-      className={`bg-white border rounded-lg p-3 text-sm font-mono transition-all duration-300 ease-in-out shadow-sm hover:shadow-lg transform card-deal-animation ${
+      className={`${currentTheme.cardStyle.background} ${currentTheme.cardStyle.border} ${currentTheme.cardStyle.text} ${currentTheme.cardStyle.shadow} border rounded-lg p-2 sm:p-3 text-xs sm:text-sm font-mono transition-all duration-300 ease-in-out hover:shadow-lg transform card-deal-animation ${
         isSelected
-          ? "ring-2 ring-blue-500 -translate-y-3 scale-105 shadow-xl bg-blue-50"
-          : "hover:-translate-y-2 hover:scale-105 hover:shadow-md"
+          ? `ring-2 ring-${currentTheme.tableStyle.accent.split('-')[1]}-500 -translate-y-2 sm:-translate-y-3 scale-105 shadow-xl bg-${currentTheme.tableStyle.accent.split('-')[1]}-50`
+          : "hover:-translate-y-1 sm:hover:-translate-y-2 hover:scale-105 hover:shadow-md"
       }`}
       data-animation-delay={index * 50}
     >
@@ -115,10 +118,20 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
   const [isHost, setIsHost] = useState(false)
   const [turnTimer, setTurnTimer] = useState<number | null>(null)
   const [timeRemaining, setTimeRemaining] = useState<number>(0)
+  const [cardHints, setCardHints] = useState<CardHint[]>([])
+  const [showHints, setShowHints] = useState(false)
+  const [showStats, setShowStats] = useState(false)
+  const [showThemeSelector, setShowThemeSelector] = useState(false)
   const supabase = createClient()
+
+  // 主题控制
+  const { currentTheme, changeTheme } = useTheme()
 
   // 音效控制
   const { triggerCardSound, triggerWinSound, toggleBackgroundMusic, backgroundMusic, SoundEffects } = useSoundEffects()
+
+  // 计算是否是我的回合
+  const isMyTurn = gameState && myPosition !== -1 && gameState.currentPlayer === myPosition
 
   // 拖拽传感器
   const sensors = useSensors(
@@ -165,6 +178,23 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
   const stopTurnTimer = () => {
     setTurnTimer(null)
     setTimeRemaining(0)
+  }
+
+  // 生成出牌提示
+  const generateCardHints = useCallback(() => {
+    if (!gameState || !isMyTurn) {
+      setCardHints([])
+      return
+    }
+    
+    const hints = getCardHints(myCards, gameState?.lastPlay, players?.length ?? 0)
+    setCardHints(hints)
+  }, [myCards, gameState, isMyTurn, players?.length])
+
+  // 应用提示
+  const applyHint = (hint: CardHint) => {
+    setSelectedCards(hint.cards)
+    setShowHints(false)
   }
 
   // 获取游戏数据
@@ -273,6 +303,9 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
         } else {
           stopTurnTimer()
         }
+        
+        // 生成出牌提示
+        generateCardHints()
       } else {
         console.log('My player not found:', {
           playerName,
@@ -592,7 +625,6 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
     }
   }, [gameState, myCards])
 
-  const isMyTurn = gameState?.currentPlayer === myPosition
   
   // Debug logging
   console.log('GameTable Debug:', {
@@ -669,6 +701,12 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
               <Button onClick={toggleBackgroundMusic} variant="outline" size="sm">
                 {backgroundMusic ? "🔇" : "🎵"}
               </Button>
+              <Button onClick={() => setShowStats(true)} variant="outline" size="sm">
+                📊 统计
+              </Button>
+              <Button onClick={() => setShowThemeSelector(true)} variant="outline" size="sm">
+                🎨 主题
+              </Button>
               {timeRemaining > 0 && (
                 <div className="flex items-center gap-2 px-3 py-1 bg-red-100 rounded-full">
                   <span className="text-sm font-medium text-red-700">
@@ -717,7 +755,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
           </CardHeader>
         </Card>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
           {players
             .filter((p) => p.position !== myPosition)
             .map((player, index) => (
@@ -730,20 +768,20 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
                 }`}
                 style={{ animationDelay: `${index * 200}ms` }}
               >
-                <CardContent className="p-4 text-center">
-                  <h3 className="font-medium mb-2 transition-all duration-300">{player.name}</h3>
-                  <div className="flex justify-center items-center gap-2">
+                <CardContent className="p-3 sm:p-4 text-center">
+                  <h3 className="font-medium mb-2 transition-all duration-300 text-sm sm:text-base">{player.name}</h3>
+                  <div className="flex flex-col sm:flex-row justify-center items-center gap-1 sm:gap-2">
                     {gameOptions.showCardCount && (
                       <Badge 
                         variant="secondary" 
-                        className="transition-all duration-300 hover:scale-105"
+                        className="transition-all duration-300 hover:scale-105 text-xs"
                       >
-                        {player.cards.length} cards
+                        {player.cards.length} 张
                       </Badge>
                     )}
                     {gameState?.currentPlayer === player.position && (
-                      <Badge className="bg-blue-500 animate-pulse">
-                        Current Turn
+                      <Badge className="bg-blue-500 animate-pulse text-xs">
+                        当前回合
                       </Badge>
                     )}
                   </div>
@@ -882,7 +920,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
                 items={myCards.map((card, index) => card.suit + '-' + card.rank + '-' + index)}
                 strategy={verticalListSortingStrategy}
               >
-                <div className="flex flex-wrap justify-center gap-2 mb-6">
+                <div className="flex flex-wrap justify-center gap-1 sm:gap-2 mb-4 sm:mb-6">
                   {myCards.map((card, index) => (
                     <DraggableCard
                       key={`${card.suit}-${card.rank}-${index}`}
@@ -890,6 +928,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
                       index={index}
                       isSelected={selectedCards.some((c) => c.suit === card.suit && c.rank === card.rank)}
                       onClick={() => handleCardClick(card)}
+                      currentTheme={currentTheme}
                     />
                   ))}
                 </div>
@@ -897,25 +936,92 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
             </DndContext>
 
             {isMyTurn ? (
-              <div className="flex justify-center gap-3">
-                <Button 
-                  onClick={handlePlay} 
-                  disabled={selectedCards.length === 0} 
-                  className={`px-6 transition-all duration-300 ${
-                    selectedCards.length > 0 
-                      ? 'play-button bg-green-600 hover:bg-green-700 shadow-lg' 
-                      : 'bg-gray-400'
-                  }`}
-                >
-                  Play Cards ({selectedCards.length})
-                </Button>
-                <Button 
-                  onClick={handlePass} 
-                  variant="outline" 
-                  className="px-6 bg-transparent hover:bg-gray-100 transition-all duration-300"
-                >
-                  Pass
-                </Button>
+              <div className="flex flex-col items-center gap-3">
+                <div className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-3 w-full"></div>
+                  <Button 
+                    onClick={handlePlay} 
+                    disabled={selectedCards.length === 0} 
+                    className={`px-4 sm:px-6 py-2 sm:py-3 transition-all duration-300 text-sm sm:text-base ${
+                      selectedCards.length > 0 
+                        ? 'play-button bg-green-600 hover:bg-green-700 shadow-lg' 
+                        : 'bg-gray-400'
+                    }`}
+                  >
+                    <span className="hidden sm:inline">Play Cards</span>
+                    <span className="sm:hidden">出牌</span> ({selectedCards.length})
+                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={handlePass} 
+                      variant="outline" 
+                      className="px-4 sm:px-6 py-2 sm:py-3 bg-transparent hover:bg-gray-100 transition-all duration-300 text-sm sm:text-base flex-1"
+                    >
+                      Pass
+                    </Button>
+                    <Button 
+                      onClick={() => setShowHints(!showHints)} 
+                      variant="outline"
+                      className="px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base flex-1"
+                    >
+                      💡
+                    </Button>
+                  </div>
+                </div>
+                
+                {/* 出牌提示 */}
+                {showHints && cardHints.length > 0 && (
+                  <div className="w-full max-w-4xl">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-center text-lg">💡 智能出牌提示</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+                          {cardHints.map((hint, index) => (
+                            <div 
+                              key={index}
+                              className="p-3 border rounded-lg hover:bg-blue-50 cursor-pointer transition-colors"
+                              onClick={() => applyHint(hint)}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <Badge variant="outline" className="text-xs">
+                                  {hint.type}
+                                </Badge>
+                                <span className="text-xs text-gray-500">
+                                  强度: {hint.strength}
+                                </span>
+                              </div>
+                              <div className="flex gap-1 mb-2">
+                                {hint.cards.map((card, cardIndex) => (
+                                  <span 
+                                    key={cardIndex}
+                                    className={`text-xs px-1 py-0.5 rounded ${
+                                      card.suit === "hearts" || card.suit === "diamonds" 
+                                        ? "bg-red-100 text-red-700" 
+                                        : "bg-gray-100 text-gray-700"
+                                    }`}
+                                  >
+                                    {card.display}
+                                    {card.suit === "hearts" && "♥"}
+                                    {card.suit === "diamonds" && "♦"}
+                                    {card.suit === "clubs" && "♣"}
+                                    {card.suit === "spades" && "♠"}
+                                  </span>
+                                ))}
+                              </div>
+                              <p className="text-sm text-gray-600">{hint.description}</p>
+                            </div>
+                          ))}
+                        </div>
+                        {cardHints.length === 0 && (
+                          <p className="text-center text-gray-500 py-4">
+                            没有可出的牌，建议跳过回合
+                          </p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="text-center">
@@ -951,6 +1057,21 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       </div>
 
       <GameOptions isOpen={showOptions} onClose={() => setShowOptions(false)} onSave={setGameOptions} />
+      
+      {/* 游戏统计 */}
+      <GameStats 
+        playerName={playerName} 
+        isOpen={showStats} 
+        onClose={() => setShowStats(false)} 
+      />
+      
+      {/* 主题选择器 */}
+      <ThemeSelector
+        isOpen={showThemeSelector}
+        onClose={() => setShowThemeSelector(false)}
+        currentTheme={currentTheme}
+        onThemeChange={changeTheme}
+      />
       
       {/* 音效组件 */}
       <SoundEffects />

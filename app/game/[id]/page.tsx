@@ -3,6 +3,7 @@
 import { useParams, useSearchParams } from "next/navigation"
 import { useState, useEffect } from "react"
 import { GameTable } from "@/components/game-table"
+import { SpectatorMode } from "@/components/spectator-mode"
 import { createClient } from "@/lib/supabase/client"
 import { createDeck, dealCards } from "@/lib/game-logic"
 import { Button } from "@/components/ui/button"
@@ -277,6 +278,10 @@ export default function GamePage() {
   }
 
   if (gameStatus === "ready") {
+    if (isSpectator) {
+      return <SpectatorMode gameId={gameId} spectatorName={playerName} />
+    }
+    
     return (
       <AppWrapper>
         <GameTable gameId={gameId} playerName={playerName} />
