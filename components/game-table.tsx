@@ -12,10 +12,85 @@ import toast from "react-hot-toast"
 import { useReconnect } from "@/hooks/use-reconnect"
 import { GameTableSkeleton } from "@/components/game-room-skeleton"
 import { CNFLIXLogo } from "@/components/cnflix-logo"
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import {
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 interface GameTableProps {
   gameId: string
   playerName: string
+}
+
+// 可拖拽的卡片组件
+function DraggableCard({ card, index, isSelected, onClick }: { 
+  card: GameCard, 
+  index: number, 
+  isSelected: boolean, 
+  onClick: () => void 
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: card.suit + '-' + card.rank + '-' + index })
+
+  // 拖拽库需要的动态样式，无法避免内联样式
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <button
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      key={`${card.suit}-${card.rank}-${index}`}
+      data-card-id={`${card.suit}-${card.rank}`}
+      onClick={onClick}
+      className={`bg-white border rounded-lg p-3 text-sm font-mono transition-all duration-300 ease-in-out shadow-sm hover:shadow-lg transform card-deal-animation ${
+        isSelected
+          ? "ring-2 ring-blue-500 -translate-y-3 scale-105 shadow-xl bg-blue-50"
+          : "hover:-translate-y-2 hover:scale-105 hover:shadow-md"
+      }`}
+      data-animation-delay={index * 50}
+    >
+      <div className="flex flex-col items-center">
+        <span className="text-lg font-bold">{card.display}</span>
+        <span
+          className={`text-2xl ${
+            card.suit === "hearts" || card.suit === "diamonds" ? "text-red-500" : "text-black"
+          }`}
+        >
+          {card.suit === "hearts" && "♥"}
+          {card.suit === "diamonds" && "♦"}
+          {card.suit === "clubs" && "♣"}
+          {card.suit === "spades" && "♠"}
+        </span>
+      </div>
+    </button>
+  )
 }
 
 export function GameTable({ gameId, playerName }: GameTableProps) {
@@ -38,6 +113,14 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
   const [showGameStart, setShowGameStart] = useState(false)
   const [isHost, setIsHost] = useState(false)
   const supabase = createClient()
+
+  // 拖拽传感器
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   // 重连功能
   const { isConnected, isReconnecting, manualReconnect } = useReconnect({
@@ -208,6 +291,28 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       console.error(`Error saving cards after ${action}:`, error)
       toast.error(`保存${action}失败`)
       return false
+    }
+  }
+
+  // 处理拖拽结束
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (active.id !== over?.id) {
+      const oldIndex = myCards.findIndex(card => 
+        card.suit + '-' + card.rank + '-' + myCards.indexOf(card) === active.id
+      )
+      const newIndex = myCards.findIndex(card => 
+        card.suit + '-' + card.rank + '-' + myCards.indexOf(card) === over?.id
+      )
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newCards = arrayMove(myCards, oldIndex, newIndex)
+        setMyCards(newCards)
+        
+        // 保存新的排序到数据库
+        await saveCardsToDatabase(newCards, "手牌重新排序")
+      }
     }
   }
 
@@ -651,35 +756,28 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap justify-center gap-2 mb-6">
-              {myCards.map((card, index) => (
-                <button
-                  key={`${card.suit}-${card.rank}-${index}`}
-                  data-card-id={`${card.suit}-${card.rank}`}
-                  onClick={() => handleCardClick(card)}
-                  className={`bg-white border rounded-lg p-3 text-sm font-mono transition-all duration-300 ease-in-out shadow-sm hover:shadow-lg transform card-deal-animation ${
-                    selectedCards.some((c) => c.suit === card.suit && c.rank === card.rank)
-                      ? "ring-2 ring-blue-500 -translate-y-3 scale-105 shadow-xl bg-blue-50"
-                      : "hover:-translate-y-2 hover:scale-105 hover:shadow-md"
-                  }`}
-                  data-animation-delay={index * 50}
-                >
-                  <div className="flex flex-col items-center">
-                    <span className="text-lg font-bold">{card.display}</span>
-                    <span
-                      className={`text-2xl ${
-                        card.suit === "hearts" || card.suit === "diamonds" ? "text-red-500" : "text-black"
-                      }`}
-                    >
-                      {card.suit === "hearts" && "♥"}
-                      {card.suit === "diamonds" && "♦"}
-                      {card.suit === "clubs" && "♣"}
-                      {card.suit === "spades" && "♠"}
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={myCards.map((card, index) => card.suit + '-' + card.rank + '-' + index)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="flex flex-wrap justify-center gap-2 mb-6">
+                  {myCards.map((card, index) => (
+                    <DraggableCard
+                      key={`${card.suit}-${card.rank}-${index}`}
+                      card={card}
+                      index={index}
+                      isSelected={selectedCards.some((c) => c.suit === card.suit && c.rank === card.rank)}
+                      onClick={() => handleCardClick(card)}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
 
             {isMyTurn ? (
               <div className="flex justify-center gap-3">
