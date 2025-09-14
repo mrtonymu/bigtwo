@@ -343,7 +343,6 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
     }
   }, [gameId, playerName, fetchGameData])
 
-
   // 保存手牌到数据库的辅助函数
   const saveCardsToDatabase = async (cards: GameCard[], action: string) => {
     try {
@@ -625,7 +624,6 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
     }
   }, [gameState, myCards])
 
-  
   // Debug logging
   console.log('GameTable Debug:', {
     gameState: gameState ? {
@@ -823,7 +821,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
 
         {/* 游戏历史记录 */}
         {gameState?.playHistory && gameState.playHistory.length > 0 && (
-          <Card>
+          <Card className="mb-6">
             <CardHeader>
               <CardTitle className="text-center">游戏历史</CardTitle>
             </CardHeader>
@@ -866,7 +864,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
           </Card>
         )}
 
-        <Card>
+        <Card className="mb-6">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-center flex-1">Your Cards ({myCards.length})</CardTitle>
@@ -934,12 +932,9 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
                 </div>
               </SortableContext>
             </DndContext>
-          </CardContent>
-        </Card>
 
-        <div className="max-w-6xl mx-auto p-4">
-          {isMyTurn ? (
-            <div className="flex flex-col items-center gap-3">
+            {isMyTurn ? (
+              <div className="flex flex-col items-center gap-3">
                 <div className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-3 w-full">
                   <Button 
                     onClick={handlePlay} 
@@ -969,6 +964,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
                       💡
                     </Button>
                   </div>
+                </div>
                 
                 {/* 出牌提示 */}
                 {showHints && cardHints.length > 0 && (
@@ -1024,6 +1020,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
                     </Card>
                   </div>
                 )}
+              </div>
             ) : (
               <div className="text-center">
                 <Badge variant="secondary" className="px-4 py-2 status-change">
@@ -1053,7 +1050,8 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
                 </div>
               </div>
             )}
-        </div>
+          </CardContent>
+        </Card>
 
         <GameOptions isOpen={showOptions} onClose={() => setShowOptions(false)} onSave={setGameOptions} />
         
@@ -1073,7 +1071,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
         />
         
         {/* 音效组件 */}
-    </div>        <SoundEffects />
+        <SoundEffects />
       </div>
     </div>
   )
