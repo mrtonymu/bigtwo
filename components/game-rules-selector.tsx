@@ -100,7 +100,7 @@ export function GameRulesSelector({ selectedRules, onRulesChange, onClose }: Gam
               playerCount: {...currentRules.playerCount, min: value}
             })}
             min={2}
-            max={6}
+            max={4}
             step={1}
           />
           <div className="text-sm text-gray-500 mt-1">{currentRules.playerCount.min}人</div>
@@ -114,7 +114,7 @@ export function GameRulesSelector({ selectedRules, onRulesChange, onClose }: Gam
               playerCount: {...currentRules.playerCount, max: value}
             })}
             min={2}
-            max={6}
+            max={4}
             step={1}
           />
           <div className="text-sm text-gray-500 mt-1">{currentRules.playerCount.max}人</div>

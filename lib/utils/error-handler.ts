@@ -153,14 +153,87 @@ export class ErrorHandler {
     return appError
   }
 
-  // 处理网络错误
-  static handleNetworkError(error: any): AppError {
-    console.error('[Network] Error:', error)
+  // 显示用户友好的错误提示
+  static showError(error: AppError | Error | unknown, context?: string): void {
+    const appError = this.handle(error, context)
     
-    const appError = createAppError(ErrorCode.NETWORK_ERROR, undefined, error)
-    toast.error(appError.message)
+    // 根据错误类型选择不同的提示方式
+    switch (appError.code) {
+      case ErrorCode.NETWORK_ERROR:
+      case ErrorCode.CONNECTION_TIMEOUT:
+        toast.error(appError.message, {
+          duration: 5000,
+          icon: '🌐'
+        })
+        break
+        
+      case ErrorCode.GAME_NOT_FOUND:
+      case ErrorCode.ROOM_FULL:
+        toast.error(appError.message, {
+          duration: 4000,
+          icon: '🎮'
+        })
+        break
+        
+      case ErrorCode.INVALID_PLAY:
+      case ErrorCode.NOT_YOUR_TURN:
+        toast.error(appError.message, {
+          duration: 3000,
+          icon: '🃏'
+        })
+        break
+        
+      case ErrorCode.UNAUTHORIZED:
+      case ErrorCode.FORBIDDEN:
+        toast.error(appError.message, {
+          duration: 4000,
+          icon: '🔒'
+        })
+        break
+        
+      default:
+        toast.error(appError.message, {
+          duration: 4000,
+          icon: '⚠️'
+        })
+    }
     
-    return appError
+    // 在开发环境下输出详细错误信息
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error Details:', {
+        code: appError.code,
+        message: appError.message,
+        details: appError.details,
+        context,
+        stack: appError.stack
+      })
+    }
+  }
+
+  // 显示成功提示
+  static showSuccess(message: string, icon?: string): void {
+    toast.success(message, {
+      duration: 3000,
+      icon: icon || '✅'
+    })
+  }
+
+  // 显示信息提示
+  static showInfo(message: string, icon?: string): void {
+    toast(message, {
+      duration: 3000,
+      icon: icon || 'ℹ️'
+    })
+  }
+
+  // 显示加载提示
+  static showLoading(message: string): string {
+    return toast.loading(message)
+  }
+
+  // 关闭加载提示
+  static dismissLoading(toastId: string): void {
+    toast.dismiss(toastId)
   }
 }
 

@@ -7,12 +7,13 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { AlertTriangle, Wifi, WifiOff, Clock } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { ErrorHandler } from '@/lib/utils/error-handler'
+import { GameSyncData } from '@/lib/types/game'
 
 interface GameNetworkManagerProps {
   gameId: string
   playerId: string
-  onGameSync?: (data: any) => void
+  onGameSync?: (data: GameSyncData) => void
   onNetworkIssue?: (issue: string) => void
 }
 
@@ -40,9 +41,10 @@ export function GameNetworkManager({
     onSync: (data) => {
       onGameSync?.(data)
       setReconnectAttempts(0) // 重置重连计数
+      ErrorHandler.showSuccess('游戏数据已同步', '🔄')
     },
     onConflict: (localData, serverData) => {
-      toast.error('检测到数据冲突，正在解决...')
+      ErrorHandler.showError(new Error('检测到数据冲突，正在解决...'), '数据冲突')
       onNetworkIssue?.('数据冲突')
       return serverData // 简单策略：优先使用服务器数据
     },
@@ -55,10 +57,10 @@ export function GameNetworkManager({
     if (networkStatus === 'offline') {
       setLastIssueTime(Date.now())
       onNetworkIssue?.('网络断开')
-      toast.error('网络连接断开，游戏将在后台继续')
+      ErrorHandler.showError(new Error('网络连接断开，游戏将在后台继续'), '网络状态')
     } else if (networkStatus === 'unstable') {
       onNetworkIssue?.('网络不稳定')
-      toast('网络连接不稳定，正在优化...', { icon: '⚠️' })
+      ErrorHandler.showInfo('网络连接不稳定，正在优化...', '⚠️')
     }
   }, [networkStatus, onNetworkIssue])
 
@@ -72,12 +74,14 @@ export function GameNetworkManager({
   }, [syncStatus, onNetworkIssue])
 
   const handleManualReconnect = async () => {
-    toast.loading('正在重新连接...', { id: 'reconnect' })
+    const loadingToast = ErrorHandler.showLoading('正在重新连接...')
     try {
       await manualSync()
-      toast.success('重连成功！', { id: 'reconnect' })
+      ErrorHandler.dismissLoading(loadingToast)
+      ErrorHandler.showSuccess('重连成功！')
     } catch (error) {
-      toast.error('重连失败，请稍后再试', { id: 'reconnect' })
+      ErrorHandler.dismissLoading(loadingToast)
+      ErrorHandler.showError(error, '重连失败')
     }
   }
 

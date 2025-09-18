@@ -13,6 +13,8 @@ import { useSmartDataSync } from "@/lib/utils/database-optimizer"
 import { useSafeTimer, useSafeSupabaseSubscription } from "@/lib/utils/memory-manager"
 import { useReconnect } from "@/hooks/use-reconnect"
 import { createClient } from "@/lib/supabase/client"
+import { type DraggableCardProps, type ThemeConfig } from "@/lib/types/game"
+import { type Theme } from "@/components/theme-selector"
 
 import { GameTableSkeleton } from "@/components/game-room-skeleton"
 import { CNFLIXLogo } from "@/components/cnflix-logo"
@@ -45,13 +47,7 @@ interface GameTableProps {
 }
 
 // 可拖拽的卡片组件
-function DraggableCard({ card, index, isSelected, onClick, currentTheme }: { 
-  card: GameCard, 
-  index: number, 
-  isSelected: boolean, 
-  onClick: () => void,
-  currentTheme: any
-}) {
+function DraggableCard({ card, index, isSelected, onClick, currentTheme }: DraggableCardProps) {
   const {
     attributes,
     listeners,

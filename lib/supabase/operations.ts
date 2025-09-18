@@ -14,7 +14,7 @@ import {
   type QueryOptions,
   type PaginatedResponse
 } from './database.types'
-import { ErrorHandler } from '@/lib/utils/error-handler'
+import { ErrorHandler, createAppError, ErrorCode } from '@/lib/utils/error-handler'
 
 /**
  * 类型安全的Supabase数据库操作封装
@@ -470,6 +470,175 @@ class SupabaseOperations {
     }
   }
 
+  /**
+   * 验证玩家回合并执行出牌操作
+   */
+  async validateAndPlayCards(
+    gameId: string, 
+    playerName: string, 
+    cards: any[], 
+    expectedTurnCount: number
+  ): Promise<SupabaseResponse<any>> {
+    try {
+      // 1. 获取游戏状态验证回合
+      const gameStateResult = await this.getGameState(gameId)
+      if (gameStateResult.error) {
+        return { data: null, error: gameStateResult.error }
+      }
+
+      const gameState = gameStateResult.data
+      if (!gameState) {
+        const error = createAppError(
+          ErrorCode.GAME_NOT_FOUND, 
+          '游戏状态不存在'
+        )
+        return { data: null, error: error }
+      }
+
+      // 2. 检查回合数是否匹配（防止并发）
+      if (gameState.turn_count !== expectedTurnCount) {
+        const error = createAppError(
+          ErrorCode.INVALID_PLAY, 
+          '回合已变化，请刷新后重试'
+        )
+        return { data: null, error: error }
+      }
+
+      // 3. 获取玩家信息验证身份
+      const playersResult = await this.getGamePlayers(gameId)
+      if (playersResult.error) {
+        return { data: null, error: playersResult.error }
+      }
+
+      const players = playersResult.data || []
+      const currentPlayer = players.find(p => p.player_name === playerName)
+      if (!currentPlayer) {
+        const error = createAppError(
+          ErrorCode.NOT_FOUND, 
+          '玩家不存在'
+        )
+        return { data: null, error: error }
+      }
+
+      // 4. 验证是否是该玩家的回合
+      if (gameState.current_player !== currentPlayer.position) {
+        const error = createAppError(
+          ErrorCode.NOT_YOUR_TURN, 
+          '当前不是您的回合'
+        )
+        return { data: null, error: error }
+      }
+
+      // 5. 更新玩家手牌
+      const newCards = currentPlayer.cards.filter(
+        (card: any) => !cards.some((selected: any) => 
+          selected.suit === card.suit && selected.rank === card.rank
+        )
+      )
+
+      const updatePlayerResult = await this.updatePlayerCards(gameId, playerName, newCards)
+      if (updatePlayerResult.error) {
+        return { data: null, error: updatePlayerResult.error }
+      }
+
+      // 6. 更新游戏状态
+      const nextPlayer = (gameState.current_player + 1) % players.length
+      const updateStateResult = await this.updateGameState(gameId, {
+        current_player: nextPlayer,
+        last_play: cards,
+        last_player: currentPlayer.position,
+        turn_count: gameState.turn_count + 1
+      })
+
+      if (updateStateResult.error) {
+        return { data: null, error: updateStateResult.error }
+      }
+
+      return { 
+        data: { 
+          newCards, 
+          nextPlayer, 
+          turnCount: gameState.turn_count + 1 
+        }, 
+        error: null 
+      }
+    } catch (error) {
+      const handledError = ErrorHandler.handleSupabaseError(error, 'validateAndPlayCards')
+      return { data: null, error: handledError }
+    }
+  }
+
+  /**
+   * 验证并执行跳过操作
+   */
+  async validateAndPass(
+    gameId: string, 
+    playerName: string, 
+    expectedTurnCount: number
+  ): Promise<SupabaseResponse<any>> {
+    try {
+      // 类似的验证逻辑
+      const gameStateResult = await this.getGameState(gameId)
+      if (gameStateResult.error) {
+        return { data: null, error: gameStateResult.error }
+      }
+      
+      if (!gameStateResult.data) {
+        const error = createAppError(
+          ErrorCode.GAME_NOT_FOUND, 
+          '游戏状态不存在'
+        )
+        return { data: null, error: error }
+      }
+
+      const gameState = gameStateResult.data
+      if (gameState.turn_count !== expectedTurnCount) {
+        const error = createAppError(
+          ErrorCode.INVALID_PLAY, 
+          '回合已变化，请刷新后重试'
+        )
+        return { data: null, error: error }
+      }
+
+      const playersResult = await this.getGamePlayers(gameId)
+      if (playersResult.error) {
+        return { data: null, error: playersResult.error }
+      }
+
+      const players = playersResult.data || []
+      const currentPlayer = players.find(p => p.player_name === playerName)
+      if (!currentPlayer || gameState.current_player !== currentPlayer.position) {
+        const error = createAppError(
+          ErrorCode.NOT_YOUR_TURN, 
+          '当前不是您的回合'
+        )
+        return { data: null, error: error }
+      }
+
+      // 更新游戏状态
+      const nextPlayer = (gameState.current_player + 1) % players.length
+      const updateResult = await this.updateGameState(gameId, {
+        current_player: nextPlayer,
+        turn_count: gameState.turn_count + 1
+      })
+
+      if (updateResult.error) {
+        return { data: null, error: updateResult.error }
+      }
+
+      return { 
+        data: { 
+          nextPlayer, 
+          turnCount: gameState.turn_count + 1 
+        }, 
+        error: null 
+      }
+    } catch (error) {
+      const handledError = ErrorHandler.handleSupabaseError(error, 'validateAndPass')
+      return { data: null, error: handledError }
+    }
+  }
+
   // ==================== Health Check ====================
 
   /**
@@ -515,5 +684,7 @@ export const {
   subscribeToPlayers,
   updateAllPlayerCards,
   getGameDetails,
+  validateAndPlayCards,
+  validateAndPass,
   checkConnection
 } = supabaseOps

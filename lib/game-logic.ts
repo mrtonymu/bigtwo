@@ -35,7 +35,7 @@ export interface Player {
 // Create a standard 52-card deck
 export function createDeck(): Card[] {
   const suits: Card["suit"][] = ["diamonds", "clubs", "hearts", "spades"] // 方块 < 梅花 < 红心 < 黑桃
-  const ranks = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] // 3, 4, 5, 6, 7, 8, 9, 10, J, Q, K, A, 2
+  const ranks = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 2] // 3, 4, 5, 6, 7, 8, 9, 10, J, Q, K, A, 2
   const displays = ["3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A", "2"]
 
   const deck: Card[] = []
@@ -68,10 +68,11 @@ export function sortCards(cards: Card[], sortBy: "suit" | "rank" | "auto" = "aut
   
   if (sortBy === "suit") {
     // Sort by suit first, then by rank
+    // 在大老二中，花色优先级：黑桃 > 红桃 > 梅花 > 方块
     return sorted.sort((a, b) => {
-      const suitOrder = { spades: 0, hearts: 1, diamonds: 2, clubs: 3 }
+      const suitOrder = { spades: 3, hearts: 2, clubs: 1, diamonds: 0 }
       if (suitOrder[a.suit] !== suitOrder[b.suit]) {
-        return suitOrder[a.suit] - suitOrder[b.suit]
+        return suitOrder[b.suit] - suitOrder[a.suit] // 降序，黑桃最大
       }
       return a.rank - b.rank
     })
@@ -81,17 +82,17 @@ export function sortCards(cards: Card[], sortBy: "suit" | "rank" | "auto" = "aut
       if (a.rank !== b.rank) {
         return a.rank - b.rank
       }
-      const suitOrder = { spades: 0, hearts: 1, diamonds: 2, clubs: 3 }
-      return suitOrder[a.suit] - suitOrder[b.suit]
+      const suitOrder = { spades: 3, hearts: 2, clubs: 1, diamonds: 0 }
+      return suitOrder[b.suit] - suitOrder[a.suit] // 降序，黑桃最大
     })
   } else {
-    // Auto sort: group by suit, then sort by rank within each suit
+    // Auto sort: 按点数排序，相同点数按花色排序
     return sorted.sort((a, b) => {
-      const suitOrder = { spades: 0, hearts: 1, diamonds: 2, clubs: 3 }
-      if (suitOrder[a.suit] !== suitOrder[b.suit]) {
-        return suitOrder[a.suit] - suitOrder[b.suit]
+      if (a.rank !== b.rank) {
+        return a.rank - b.rank
       }
-      return a.rank - b.rank
+      const suitOrder = { spades: 3, hearts: 2, clubs: 1, diamonds: 0 }
+      return suitOrder[b.suit] - suitOrder[a.suit] // 降序，黑桃最大
     })
   }
 }
@@ -213,31 +214,40 @@ function hasDiamond3(cards: Card[]): boolean {
 
 
 // Check if five cards form a valid hand (straight, flush, full house, four of a kind + one)
-function isFiveCardHand(cards: Card[]): boolean {
+export function isFiveCardHand(cards: Card[]): boolean {
   if (cards.length !== 5) return false
 
   const sorted = [...cards].sort((a, b) => getCardValue(a) - getCardValue(b))
-
+  const ranks = sorted.map(c => c.rank)
+  
   // Check for flush (同花)
   const isFlush = cards.every((card) => card.suit === cards[0].suit)
 
-  // Check for straight (顺子) - handle A-2-3-4-5 and 10-J-Q-K-A
-  const ranks = sorted.map(c => c.rank)
+  // Check for straight (顺子) - handle special cases
+  let isStraight = false
   
-  // Handle special straights first
-  const isSpecialStraight = 
-    // A-2-3-4-5 straight
-    (ranks[0] === 3 && ranks[1] === 4 && ranks[2] === 5 && ranks[3] === 6 && ranks[4] === 7) ||
-    // 10-J-Q-K-A straight  
-    (ranks[0] === 10 && ranks[1] === 11 && ranks[2] === 12 && ranks[3] === 13 && ranks[4] === 14)
-  
-  // Handle normal straight
-  const isNormalStraight = ranks.every((rank, i) => {
-    if (i === 0) return true
-    return rank === ranks[i - 1] + 1
-  })
-  
-  const isStraight = isSpecialStraight || isNormalStraight
+  // Special case: A-2-3-4-5 (A=14, 2=2, so need special handling)
+  if (ranks.includes(14) && ranks.includes(2) && ranks.includes(3) && ranks.includes(4) && ranks.includes(5)) {
+    isStraight = true
+  }
+  // Special case: 10-J-Q-K-A
+  else if (ranks.includes(10) && ranks.includes(11) && ranks.includes(12) && ranks.includes(13) && ranks.includes(14)) {
+    isStraight = true
+  }
+  // Normal straights
+  else {
+    const sortedRanks = [...ranks].sort((a, b) => {
+      // For normal sorting, treat 2 as lowest for straight detection
+      const getValue = (rank: number) => rank === 2 ? 15 : rank
+      return getValue(a) - getValue(b)
+    })
+    
+    isStraight = sortedRanks.every((rank, i) => {
+      if (i === 0) return true
+      const getValue = (rank: number) => rank === 2 ? 15 : rank
+      return getValue(rank) === getValue(sortedRanks[i - 1]) + 1
+    })
+  }
 
   // Check for straight flush (同花顺)
   const isStraightFlush = isStraight && isFlush
@@ -282,12 +292,19 @@ function isHigherCombination(cardsA: Card[], cardsB: Card[]): boolean {
 }
 
 // Get numeric value for card comparison
-function getCardValue(card: Card): number {
+export function getCardValue(card: Card): number {
   // Suit order: diamonds < clubs < hearts < spades (方块 < 梅花 < 红心 < 黑桃)
   const suitValue = ["diamonds", "clubs", "hearts", "spades"].indexOf(card.suit)
   // Rank order: 3 < 4 < 5 < 6 < 7 < 8 < 9 < 10 < J < Q < K < A < 2
   // 2 is the highest, so it gets the highest value
-  const rankValue = card.rank === 15 ? 13 : card.rank - 3 // 2=13, A=12, K=11, ..., 3=0
+  let rankValue: number
+  if (card.rank === 2) {
+    rankValue = 12 // 2 is highest
+  } else if (card.rank === 14) {
+    rankValue = 11 // A is second highest
+  } else {
+    rankValue = card.rank - 3 // 3=0, 4=1, ..., K=10
+  }
   return rankValue * 4 + suitValue
 }
 
@@ -434,14 +451,31 @@ function isFlush(cards: Card[]): boolean {
 
 function isStraight(cards: Card[]): boolean {
   if (cards.length !== 5) return false
-  const sorted = [...cards].sort((a, b) => getCardValue(a) - getCardValue(b))
+  
+  // 按照大老二的规则排序：3=0, 4=1, ..., A=11, 2=12
+  const sorted = [...cards].sort((a, b) => a.rank - b.rank)
   const ranks = sorted.map(c => c.rank)
-  return ranks.every((rank, i) => {
-    if (i === 0) return true
-    return rank === ranks[i - 1] + 1
-  }) || 
-  (ranks[0] === 3 && ranks[1] === 4 && ranks[2] === 5 && ranks[3] === 6 && ranks[4] === 7) ||
-  (ranks[0] === 10 && ranks[1] === 11 && ranks[2] === 12 && ranks[3] === 13 && ranks[4] === 14)
+  
+  // 检查是否为连续的5张牌
+  // 注意：在大老二中，2是最大的牌，不能与A连接形成顺子
+  // 有效的顺子：3-4-5-6-7, 4-5-6-7-8, ..., 9-10-J-Q-K, 10-J-Q-K-A
+  // 无效的顺子：Q-K-A-2-3, K-A-2-3-4, A-2-3-4-5
+  
+  // 检查标准顺子（不包含2）
+  let isConsecutive = true
+  for (let i = 1; i < ranks.length; i++) {
+    if (ranks[i] !== ranks[i - 1] + 1) {
+      isConsecutive = false
+      break
+    }
+  }
+  
+  // 如果是连续的且最大牌不是2，则是有效顺子
+  if (isConsecutive && ranks[ranks.length - 1] !== 12) {
+    return true
+  }
+  
+  return false
 }
 
 // 智能出牌提示

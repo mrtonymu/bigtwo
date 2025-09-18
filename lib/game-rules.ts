@@ -133,7 +133,7 @@ export const PRESET_RULES: { [key: string]: GameRules } = {
     id: 'casual',
     name: '休闲模式',
     description: '更轻松的朋友聚会规则',
-    playerCount: { min: 2, max: 6, default: 4 },
+    playerCount: { min: 2, max: 4, default: 4 },
     allowedCombinations: {
       single: true,
       pair: true,
@@ -174,8 +174,8 @@ export class GameRulesValidator {
     if (rules.playerCount.min < 2) {
       errors.push('最少玩家数量不能少于2人')
     }
-    if (rules.playerCount.max > 6) {
-      errors.push('最多玩家数量不能超过6人')
+    if (rules.playerCount.max > 4) {
+      errors.push('最多玩家数量不能超过4人（标准52张牌限制）')
     }
     if (rules.playerCount.default < rules.playerCount.min || 
         rules.playerCount.default > rules.playerCount.max) {

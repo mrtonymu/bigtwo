@@ -1,15 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabaseOps } from '@/lib/supabase/operations'
 import { ErrorHandler } from '@/lib/utils/error-handler'
-
-interface NetworkOptimizationOptions {
-  gameId: string
-  playerId: string
-  onSync?: (data: any) => void
-  onConflict?: (localData: any, serverData: any) => any
-  maxRetries?: number
-  syncInterval?: number
-}
+import { 
+  type NetworkOptimizationOptions, 
+  type GameSyncData, 
+  type OfflineOperation 
+} from '@/lib/types/game'
 
 /**
  * 网络优化Hook - 处理网络波动时的游戏同步
@@ -33,12 +29,12 @@ export function useNetworkOptimization(options: NetworkOptimizationOptions) {
 
   const [networkStatus, setNetworkStatus] = useState<'online' | 'offline' | 'unstable'>('online')
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'conflict' | 'failed'>('synced')
-  const [pendingOperations, setPendingOperations] = useState<any[]>([])
+  const [pendingOperations, setPendingOperations] = useState<OfflineOperation[]>([])
   const [lastSyncTime, setLastSyncTime] = useState<number>(Date.now())
   
   const syncTimeoutRef = useRef<NodeJS.Timeout>()
   const retryCountRef = useRef(0)
-  const offlineQueueRef = useRef<any[]>([])
+  const offlineQueueRef = useRef<OfflineOperation[]>([])
 
   // 网络状态监听
   useEffect(() => {
@@ -106,17 +102,47 @@ export function useNetworkOptimization(options: NetworkOptimizationOptions) {
 
       const serverData = gameDetails.data
       
+      if (!serverData) {
+        throw new Error('无法获取游戏数据')
+      }
+
+      // 构造符合 GameSyncData 类型的数据
+      const syncData: GameSyncData = {
+        gameState: serverData.gameState ? {
+          id: serverData.gameState.id,
+          currentPlayer: serverData.gameState.current_player,
+          lastPlay: serverData.gameState.last_play || [],
+          lastPlayer: serverData.gameState.last_player || undefined,
+          turnCount: serverData.gameState.turn_count,
+          playHistory: serverData.gameState.play_history || []
+        } : {
+          id: gameId,
+          currentPlayer: 0,
+          turnCount: 0,
+          lastPlay: [],
+          playHistory: []
+        },
+        players: serverData.players ? serverData.players.map(p => ({
+          id: p.id,
+          name: p.player_name,
+          position: p.position,
+          cards: p.cards,
+          isSpectator: p.is_spectator
+        })) : [],
+        lastUpdated: Date.now()
+      }
+      
       // 检查是否有本地待处理操作
       if (offlineQueueRef.current.length > 0) {
         console.log(`📤 应用 ${offlineQueueRef.current.length} 个离线操作`)
-        await applyOfflineOperations(serverData)
+        await applyOfflineOperations(syncData)
       }
 
       // 同步成功
       setSyncStatus('synced')
       setLastSyncTime(Date.now())
       retryCountRef.current = 0
-      onSync?.(serverData)
+      onSync?.(syncData)
       
       console.log('✅ 游戏状态同步完成')
       
@@ -127,7 +153,7 @@ export function useNetworkOptimization(options: NetworkOptimizationOptions) {
   }, [gameId, syncStatus, onSync])
 
   // 应用离线操作
-  const applyOfflineOperations = useCallback(async (serverData: any) => {
+  const applyOfflineOperations = useCallback(async (serverData: GameSyncData) => {
     const operations = [...offlineQueueRef.current]
     offlineQueueRef.current = []
 
@@ -166,11 +192,11 @@ export function useNetworkOptimization(options: NetworkOptimizationOptions) {
   }, [])
 
   // 验证离线出牌是否仍然有效
-  const validateOfflinePlay = async (operation: any, serverData: any): Promise<boolean> => {
-    const { gameState, players } = serverData
+  const validateOfflinePlay = async (operation: OfflineOperation, serverData: GameSyncData): Promise<boolean> => {
+    const { gameState } = serverData
     
     // 检查游戏状态是否变化
-    if (gameState.turn_count !== operation.expectedTurnCount) {
+    if (gameState.turnCount !== operation.expectedTurnCount) {
       return false
     }
     
@@ -183,23 +209,25 @@ export function useNetworkOptimization(options: NetworkOptimizationOptions) {
   }
 
   // 执行出牌操作
-  const executePlay = async (operation: any) => {
+  const executePlay = async (operation: OfflineOperation) => {
     // 实现具体的出牌逻辑
     console.log('执行出牌:', operation.cards)
   }
 
   // 执行跳过操作
-  const executePass = async (operation: any) => {
+  const executePass = async (operation: OfflineOperation) => {
     console.log('执行跳过')
   }
 
   // 执行手牌更新
-  const executeCardUpdate = async (operation: any) => {
-    await supabaseOps.updatePlayerCards(gameId, operation.playerName, operation.cards)
+  const executeCardUpdate = async (operation: OfflineOperation) => {
+    if (operation.playerName && operation.cards) {
+      await supabaseOps.updatePlayerCards(gameId, operation.playerName, operation.cards)
+    }
   }
 
   // 处理同步错误
-  const handleSyncError = useCallback((error: any) => {
+  const handleSyncError = useCallback((error: Error | unknown) => {
     retryCountRef.current += 1
     
     if (retryCountRef.current <= maxRetries) {
@@ -217,7 +245,7 @@ export function useNetworkOptimization(options: NetworkOptimizationOptions) {
   }, [maxRetries, performFullSync])
 
   // 添加离线操作到队列
-  const queueOfflineOperation = useCallback((operation: any) => {
+  const queueOfflineOperation = useCallback((operation: OfflineOperation) => {
     console.log('📝 添加离线操作到队列:', operation.type)
     operation.timestamp = Date.now()
     operation.playerId = playerId
