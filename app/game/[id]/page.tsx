@@ -35,9 +35,15 @@ export default function GamePage() {
       .on("postgres_changes", { event: "*", schema: "public", table: "players", filter: `game_id=eq.${gameId}` }, () =>
         checkGameStatus(),
       )
-      .on("postgres_changes", { event: "*", schema: "public", table: "games", filter: `id=eq.${gameId}` }, () =>
-        checkGameStatus(),
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "games", filter: `id=eq.${gameId}` }, (payload) => {
+        // 当游戏状态发生变化时，检查并更新本地状态
+        if (payload.new && (payload.new as any).status === "in_progress") {
+          setGameStatus("ready")
+        } else if (payload.new && (payload.new as any).status === "finished") {
+          setGameStatus("waiting")
+        }
+        checkGameStatus()
+      })
       .on("postgres_changes", { event: "*", schema: "public", table: "game_state", filter: `game_id=eq.${gameId}` }, () =>
         checkGameStatus(),
       )
@@ -78,10 +84,7 @@ export default function GamePage() {
 
       // 检查游戏是否正在进行中
       if ((gameData as any).status === "in_progress") {
-        // 确保router已定义再使用
-        if (router) {
-          router.push(`/game/${gameId}`);
-        }
+        setGameStatus("ready")
         return;
       }
 

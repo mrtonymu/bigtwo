@@ -80,6 +80,7 @@ function DraggableCard({ card, index, isSelected, onClick, currentTheme, clickAn
       } modern-card-deal enhanced-card-hover ${
         isSelected ? 'enhanced-card-selected' : ''
       } ${clickAnimation === `${card.suit}-${card.rank}` ? 'card-flip' : ''} 
+      ${currentTheme.cardStyle.background} ${currentTheme.cardStyle.border} ${currentTheme.cardStyle.text} ${currentTheme.cardStyle.shadow}
       w-full h-auto min-h-[60px] sm:min-h-[80px] 
       text-xs sm:text-sm 
       touch-manipulation 
@@ -368,50 +369,53 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       }
 
       // 找到当前玩家的位置和手牌
-      const myPlayer = playersData.find((p: any) => p.player_name === playerName)
-      if (myPlayer) {
-        console.log('Found my player:', {
-          name: myPlayer.player_name,
-          position: myPlayer.position,
-          cards: myPlayer.cards?.length || 0
-        })
-        setMyPosition(myPlayer.position)
-        setIsHost(myPlayer.position === 0) // Host is player with position 0
-        
-        // 只有在非手动排序时才重新排序手牌
-        if (!isManualSort) {
-          let sortedCards = myPlayer.cards || []
-          if (gameOptions.autoArrange) {
-            sortedCards = autoArrangeCards(sortedCards)
-          } else {
-            sortedCards = sortCards(sortedCards, gameOptions.cardSorting)
-          }
-          setMyCards(sortedCards)
-        } else {
-          // 手动排序时，只更新手牌数量，保持当前顺序
-          setMyCards(prevCards => {
-            // 如果手牌数量发生变化（比如出牌后），则更新
-            if (prevCards.length !== myPlayer.cards?.length) {
-              return myPlayer.cards || []
+      // 添加检查确保playerName不为空
+      if (playerName && playerName.trim() !== '') {
+        const myPlayer = playersData.find((p: any) => p.player_name === playerName)
+        if (myPlayer) {
+          console.log('Found my player:', {
+            name: myPlayer.player_name,
+            position: myPlayer.position,
+            cards: myPlayer.cards?.length || 0
+          })
+          setMyPosition(myPlayer.position)
+          setIsHost(myPlayer.position === 0) // Host is player with position 0
+          
+          // 只有在非手动排序时才重新排序手牌
+          if (!isManualSort) {
+            let sortedCards = myPlayer.cards || []
+            if (gameOptions.autoArrange) {
+              sortedCards = autoArrangeCards(sortedCards)
+            } else {
+              sortedCards = sortCards(sortedCards, gameOptions.cardSorting)
             }
-            return prevCards
+            setMyCards(sortedCards)
+          } else {
+            // 手动排序时，只更新手牌数量，保持当前顺序
+            setMyCards(prevCards => {
+              // 如果手牌数量发生变化（比如出牌后），则更新
+              if (prevCards.length !== myPlayer.cards?.length) {
+                return myPlayer.cards || []
+              }
+              return prevCards
+            })
+          }
+          
+          // 如果是我的回合，启动计时器
+          if (newState.gameState && newState.gameState.currentPlayer === myPlayer.position) {
+            startTurnTimer() // 使用游戏速度设置的时长
+          } else {
+            stopTurnTimer()
+          }
+          
+          // 生成出牌提示
+          generateCardHints()
+        } else {
+          console.log('My player not found:', {
+            playerName,
+            allPlayers: playersData.map((p: any) => ({ name: p.player_name, position: p.position }))
           })
         }
-        
-        // 如果是我的回合，启动计时器
-        if (newState.gameState && newState.gameState.currentPlayer === myPlayer.position) {
-          startTurnTimer() // 使用游戏速度设置的时长
-        } else {
-          stopTurnTimer()
-        }
-        
-        // 生成出牌提示
-        generateCardHints()
-      } else {
-        console.log('My player not found:', {
-          playerName,
-          allPlayers: playersData.map((p: any) => ({ name: p.player_name, position: p.position }))
-        })
       }
 
       setIsLoading(false)
@@ -473,7 +477,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
   }
 
   // 处理拖拽结束 - 优化版本
-  const handleDragEnd = async (event: DragEndEvent) => {
+  const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
 
     if (active.id !== over?.id) {
@@ -863,7 +867,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
 
   if (showGameStart) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className={`min-h-screen ${currentTheme.tableStyle.background} flex items-center justify-center`}>
         <Card className="w-full max-w-md mx-4">
           <CardContent className="text-center p-8">
             <div className="text-6xl mb-4">🎮</div>
@@ -884,7 +888,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
   // Show winner screen
   if (gameWinner) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className={`min-h-screen ${currentTheme.tableStyle.background} flex items-center justify-center`}>
         <Card className="w-full max-w-md mx-4">
           <CardContent className="text-center p-8">
             <div className="text-6xl mb-4">🎉</div>
@@ -990,7 +994,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       </header>
 
       <div className="max-w-6xl mx-auto p-4">
-        <Card className="mb-6 status-change">
+        <Card className={`mb-6 ${currentTheme.tableStyle.background === 'bg-gray-900' ? 'bg-gray-800' : 'bg-white'}`}>
           <CardHeader className="pb-3">
             <div className="flex justify-between items-center">
               <CardTitle className="text-lg">Game Status</CardTitle>
@@ -1014,7 +1018,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
                   gameState?.currentPlayer === player.position 
                     ? 'ring-2 ring-blue-500 shadow-lg transform scale-105' 
                     : 'hover:transform hover:scale-102'
-                }`}
+                } ${currentTheme.tableStyle.background === 'bg-gray-900' ? 'bg-gray-800' : 'bg-white'}`}
                 style={{ animationDelay: `${index * 200}ms` }}
               >
                 <CardContent className="p-2 sm:p-3 lg:p-4 text-center">
@@ -1051,7 +1055,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
                   return (
                     <div 
                       key={`last-play-${card.suit}-${card.rank}-${index}`}
-                      className={`playing-card ${suitClass} modern-card-play`}
+                      className={`playing-card ${suitClass} modern-card-play ${currentTheme.cardStyle.background} ${currentTheme.cardStyle.border} ${currentTheme.cardStyle.text} ${currentTheme.cardStyle.shadow}`}
                       data-animation-delay={index * 100}
                     >
                       <div className="flex flex-col items-center">
@@ -1090,7 +1094,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
                 {gameState?.playHistory?.slice(-10).reverse().map((play, index) => (
                   <div 
                     key={`history-${play.turn}-${index}`}
-                    className="flex items-center justify-between p-2 bg-gray-50 rounded-lg text-sm"
+                    className={`flex items-center justify-between p-2 ${currentTheme.tableStyle.background === 'bg-gray-900' ? 'bg-gray-800' : 'bg-gray-50'} rounded-lg text-sm`}
                   >
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-blue-600">第{play.turn}轮</span>
@@ -1181,7 +1185,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
                 items={myCards.map((card, index) => card.suit + '-' + card.rank + '-' + index)}
                 strategy={verticalListSortingStrategy}
               >
-                <div className="flex flex-wrap justify-center gap-1 sm:gap-2 mb-4 sm:mb-6 px-1 sm:px-0">
+                <div className={`flex flex-wrap justify-center gap-1 sm:gap-2 mb-4 sm:mb-6 px-1 sm:px-0 ${currentTheme.tableStyle.background === 'bg-gray-900' ? 'bg-gray-800' : 'bg-gray-50'} p-2 rounded-lg`}>
                   {myCards.map((card, index) => {
                     // 移动端动态卡牌大小计算
                     const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
@@ -1259,7 +1263,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
                 {/* 出牌提示 */}
                 {showHints && cardHints.length > 0 && (
                   <div className="w-full max-w-4xl">
-                    <Card>
+                    <Card className={currentTheme.tableStyle.background === 'bg-gray-900' ? 'bg-gray-800' : 'bg-white'}>
                       <CardHeader>
                         <CardTitle className="text-center text-lg">💡 智能出牌提示</CardTitle>
                       </CardHeader>
@@ -1268,7 +1272,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
                           {cardHints.map((hint, index) => (
                             <div 
                               key={index}
-                              className="p-3 border rounded-lg hover:bg-blue-50 cursor-pointer transition-colors"
+                              className={`p-3 border rounded-lg hover:${currentTheme.tableStyle.background === 'bg-gray-900' ? 'bg-gray-700' : 'bg-blue-50'} cursor-pointer transition-colors ${currentTheme.tableStyle.background === 'bg-gray-900' ? 'border-gray-600' : 'border-gray-200'}`}
                               onClick={() => applyHint(hint)}
                             >
                               <div className="flex items-center justify-between mb-2">
@@ -1287,7 +1291,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
                                   return (
                                     <span 
                                       key={cardIndex}
-                                      className={`card-hint-chip ${suitClass}`}
+                                      className={`card-hint-chip ${suitClass} ${currentTheme.cardStyle.background} ${currentTheme.cardStyle.border} ${currentTheme.cardStyle.text}`}
                                     >
                                       {card.display}
                                       {card.suit === "hearts" && "♥"}
