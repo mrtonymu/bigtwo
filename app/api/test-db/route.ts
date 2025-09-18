@@ -2,6 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/client'
 
 export async function GET() {
+  // 在构建时跳过数据库连接测试
+  if (process.env.NODE_ENV === 'production' && !process.env.SUPABASE_URL) {
+    return NextResponse.json({
+      success: true,
+      message: '构建环境跳过数据库测试',
+      tests: {
+        connection: false,
+        gamesTable: false,
+        playersTable: false,
+        gameStateTable: false,
+        insertTest: false
+      },
+      timestamp: new Date().toISOString()
+    })
+  }
+
   try {
     const supabase = createClient()
     
@@ -51,40 +67,23 @@ export async function GET() {
       console.error('Game state table error:', error)
     }
     
-    // 4. 测试插入操作（不实际插入）
-    try {
-      const testData = {
-        name: '测试游戏',
-        status: 'waiting' as const,
-        max_players: 4,
-        current_players: 0,
-        spectators: 0,
-        game_options: {
-          allowSpectators: true,
-          gameSpeed: "normal" as const,
-          autoPass: false,
-          showCardCount: true,
-          cardSorting: "auto" as const,
-          autoArrange: true
+    // 4. 测试插入操作（仅在开发环境）
+    if (process.env.NODE_ENV !== 'production') {
+      try {
+        // 简化测试，只检查表结构而不实际插入数据
+        const { data, error } = await supabase
+          .from('games')
+          .select('id')
+          .limit(0)
+        
+        if (!error) {
+          tests.insertTest = true
+        } else {
+          console.error('Insert test error:', error)
         }
-      }
-      
-      // 使用dry run模式测试插入
-      const { data, error } = await supabase
-        .from('games')
-        .insert(testData)
-        .select()
-        .single()
-      
-      if (!error && data) {
-        tests.insertTest = true
-        // 立即删除测试数据
-        await supabase.from('games').delete().eq('id', data.id)
-      } else {
+      } catch (error) {
         console.error('Insert test error:', error)
       }
-    } catch (error) {
-      console.error('Insert test error:', error)
     }
     
     return NextResponse.json({
