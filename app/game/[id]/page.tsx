@@ -1,6 +1,6 @@
 "use client"
 
-import { useParams, useSearchParams } from "next/navigation"
+import { useParams, useSearchParams, useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
 import { GameTable } from "@/components/game-table"
 import { SpectatorMode } from "@/components/spectator-mode"
@@ -15,6 +15,7 @@ import { AppWrapper } from "@/components/app-wrapper"
 export default function GamePage() {
   const params = useParams()
   const searchParams = useSearchParams()
+  const router = useRouter()
   const gameId = params.id as string
   const playerName = searchParams.get("player") || ""
   const isSpectator = searchParams.get("spectate") === "true"
@@ -77,7 +78,10 @@ export default function GamePage() {
 
       // 检查游戏是否正在进行中
       if ((gameData as any).status === "in_progress") {
-        router.push(`/game/${gameId}`);
+        // 确保router已定义再使用
+        if (router) {
+          router.push(`/game/${gameId}`);
+        }
         return;
       }
 
@@ -126,10 +130,11 @@ export default function GamePage() {
     
     try {
       // Update game status to finished
-      const { error: updateGameError } = await supabase
+      const { error: updateGameError } = await (supabase as any)
         .from("games")
-        .update({ status: "finished" } as any)
+        .update({ status: "finished" })
         .eq("id", gameId)
+        .select()
       
       if (updateGameError) {
         console.error("Error ending game:", updateGameError)
@@ -229,7 +234,6 @@ export default function GamePage() {
                     onClick={endGame} 
                     variant="destructive" 
                     className="w-full"
-                    disabled={gameStatus === "loading" || gameStatus === "not-found"}
                   >
                     🏁 结束游戏
                   </Button>

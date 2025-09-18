@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from 'react'
-import useSound from 'use-sound'
 
 interface SoundEffectsProps {
   playCardSound: boolean
@@ -18,22 +17,6 @@ export function SoundEffects({
   onCardPlayed,
   onGameWon 
 }: SoundEffectsProps) {
-  // 使用Web Audio API生成音效
-  const [playCard] = useSound('/sounds/card-play.mp3', { 
-    volume: 0.3,
-    onend: onCardPlayed 
-  })
-  
-  const [playWin] = useSound('/sounds/win.mp3', { 
-    volume: 0.5,
-    onend: onGameWon 
-  })
-
-  const [playBackground] = useSound('/sounds/background.mp3', { 
-    volume: 0.1,
-    loop: true 
-  })
-
   // 生成简单的音效
   useEffect(() => {
     if (typeof window !== 'undefined') {
