@@ -126,7 +126,11 @@ export class ErrorHandler {
     }
 
     const appError = createAppError(errorCode, message, error)
-    toast.error(appError.message)
+    
+    // 只在客户端环境下显示toast
+    if (typeof window !== 'undefined') {
+      toast.error(appError.message)
+    }
     
     return appError
   }
@@ -156,6 +160,11 @@ export class ErrorHandler {
   // 显示用户友好的错误提示
   static showError(error: AppError | Error | unknown, context?: string): void {
     const appError = this.handle(error, context)
+    
+    // 只在客户端环境下显示toast
+    if (typeof window === 'undefined') {
+      return
+    }
     
     // 根据错误类型选择不同的提示方式
     switch (appError.code) {
@@ -210,30 +219,101 @@ export class ErrorHandler {
     }
   }
 
+  // 处理网络错误
+  static handleNetworkError(error: any): AppError {
+    console.error('[Network] Error:', error)
+    
+    let errorCode = ErrorCode.NETWORK_ERROR
+    let message = ERROR_MESSAGES[ErrorCode.NETWORK_ERROR]
+    
+    // 根据错误类型细分
+    if (error?.message?.includes('timeout') || error?.code === 'TIMEOUT') {
+      errorCode = ErrorCode.CONNECTION_TIMEOUT
+      message = ERROR_MESSAGES[ErrorCode.CONNECTION_TIMEOUT]
+    } else if (error?.message?.includes('offline') || !navigator.onLine) {
+      message = '网络连接已断开，请检查网络连接'
+    }
+    
+    const appError = createAppError(errorCode, message, error)
+    toast.error(appError.message, {
+      duration: 5000,
+      icon: '🌐'
+    })
+    
+    return appError
+  }
+
+  // 处理输入验证错误
+  static handleValidationError(errors: string[], context?: string): AppError {
+    const message = errors.length > 1 
+      ? `输入验证失败：${errors.join('、')}`
+      : errors[0]
+    
+    const appError = createAppError(ErrorCode.INVALID_INPUT, message, { errors, context })
+    
+    toast.error(appError.message, {
+      duration: 4000,
+      icon: '⚠️'
+    })
+    
+    return appError
+  }
+
+  // 处理权限错误
+  static handleAuthError(error: any, action?: string): AppError {
+    console.error('[Auth] Error:', error)
+    
+    let errorCode = ErrorCode.UNAUTHORIZED
+    let message = ERROR_MESSAGES[ErrorCode.UNAUTHORIZED]
+    
+    if (error?.status === 403 || error?.code === 'FORBIDDEN') {
+      errorCode = ErrorCode.FORBIDDEN
+      message = action ? `无权限执行操作：${action}` : ERROR_MESSAGES[ErrorCode.FORBIDDEN]
+    }
+    
+    const appError = createAppError(errorCode, message, error)
+    
+    toast.error(appError.message, {
+      duration: 4000,
+      icon: '🔒'
+    })
+    
+    return appError
+  }
+
   // 显示成功提示
   static showSuccess(message: string, icon?: string): void {
-    toast.success(message, {
-      duration: 3000,
-      icon: icon || '✅'
-    })
+    if (typeof window !== 'undefined') {
+      toast.success(message, {
+        duration: 3000,
+        icon: icon || '✅'
+      })
+    }
   }
 
   // 显示信息提示
   static showInfo(message: string, icon?: string): void {
-    toast(message, {
-      duration: 3000,
-      icon: icon || 'ℹ️'
-    })
+    if (typeof window !== 'undefined') {
+      toast(message, {
+        duration: 3000,
+        icon: icon || 'ℹ️'
+      })
+    }
   }
 
   // 显示加载提示
   static showLoading(message: string): string {
-    return toast.loading(message)
+    if (typeof window !== 'undefined') {
+      return toast.loading(message)
+    }
+    return ''
   }
 
   // 关闭加载提示
   static dismissLoading(toastId: string): void {
-    toast.dismiss(toastId)
+    if (typeof window !== 'undefined') {
+      toast.dismiss(toastId)
+    }
   }
 }
 
@@ -265,9 +345,44 @@ export function useErrorHandler() {
     return ErrorHandler.handleGameError(error, action)
   }
 
+  const handleNetworkError = (error: any) => {
+    return ErrorHandler.handleNetworkError(error)
+  }
+
+  const handleValidationError = (errors: string[], context?: string) => {
+    return ErrorHandler.handleValidationError(errors, context)
+  }
+
+  const handleAuthError = (error: any, action?: string) => {
+    return ErrorHandler.handleAuthError(error, action)
+  }
+
+  const showSuccess = (message: string, icon?: string) => {
+    ErrorHandler.showSuccess(message, icon)
+  }
+
+  const showInfo = (message: string, icon?: string) => {
+    ErrorHandler.showInfo(message, icon)
+  }
+
+  const showLoading = (message: string) => {
+    return ErrorHandler.showLoading(message)
+  }
+
+  const dismissLoading = (toastId: string) => {
+    ErrorHandler.dismissLoading(toastId)
+  }
+
   return {
     handleError,
     handleSupabaseError,
-    handleGameError
+    handleGameError,
+    handleNetworkError,
+    handleValidationError,
+    handleAuthError,
+    showSuccess,
+    showInfo,
+    showLoading,
+    dismissLoading
   }
 }

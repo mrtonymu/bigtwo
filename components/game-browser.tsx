@@ -31,41 +31,30 @@ export function GameBrowser({ playerName }: GameBrowserProps) {
   const router = useRouter()
 
   useEffect(() => {
-    // 简化初始化，直接设置loading为false
-    setIsLoading(false)
-    setGames([])
+    fetchGames()
   }, [])
 
   const fetchGames = async () => {
-    console.log("[CNFLIX] Fetching games from database...")
+    console.log("[CNFLIX] Fetching games from API...")
+    setIsLoading(true)
     try {
-      const { data: gamesData, error } = await supabase
-        .from("games")
-        .select(`
-          id,
-          name,
-          status,
-          max_players,
-          current_players,
-          spectators,
-          created_at
-        `)
-        .order("created_at", { ascending: false })
+      const response = await fetch('/api/games')
+      const result = await response.json()
 
-      if (error) {
-        console.error("Supabase error:", error)
+      if (!result.success) {
+        console.error("API error:", result.error)
         toast.error("获取房间列表失败")
         setGames([])
         return
       }
 
-      console.log("[CNFLIX] Games data received:", gamesData)
+      console.log("[CNFLIX] Games data received:", result.data)
 
-      const gameRooms: GameRoom[] = (gamesData || []).map((game) => ({
+      const gameRooms: GameRoom[] = (result.data || []).map((game: any) => ({
         id: game.id,
         name: game.name,
-        players: game.current_players,
-        maxPlayers: game.max_players,
+        players: game.current_players || 0,
+        maxPlayers: game.max_players || 4,
         spectators: game.spectators || 0,
         status: game.status as "waiting" | "in-progress" | "finished",
         created_at: game.created_at,
@@ -88,7 +77,7 @@ export function GameBrowser({ playerName }: GameBrowserProps) {
 
   const spectateGame = (gameId: string) => {
     if (!playerName.trim()) {
-      toast.error("请先输入观影者名称")
+      toast.error("请先输入玩家名称")
       return
     }
     router.push(`/game/${gameId}?player=${encodeURIComponent(playerName.trim())}&spectate=true`)
@@ -96,50 +85,44 @@ export function GameBrowser({ playerName }: GameBrowserProps) {
 
   const joinGame = async (gameId: string) => {
     if (!playerName.trim()) {
-      toast.error("请先输入观影者名称")
+      toast.error("请先输入玩家名称")
       return
     }
 
-    const loadingToast = toast.loading("正在加入观影房间...")
+    const loadingToast = toast.loading("正在加入游戏房间...")
 
     try {
-      const { data: playersData } = await supabase
-        .from("players")
-        .select("position")
-        .eq("game_id", gameId)
-        .eq("is_spectator", false)
+      // 使用新的API路由加入游戏
+      const response = await fetch(`/api/games/${gameId}/players`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          playerName: playerName.trim(),
+          isSpectator: false
+        })
+      })
 
-      const nextPosition = playersData?.length || 0
+      const result = await response.json()
 
-      if (nextPosition >= 4) {
+      if (!result.success) {
         toast.dismiss(loadingToast)
-        toast.error("房间已满，只能观看")
-        spectateGame(gameId)
+        if (result.error?.includes('已满')) {
+          toast.error("房间已满，只能观看")
+          spectateGame(gameId)
+        } else {
+          toast.error(result.error || '加入游戏失败')
+        }
         return
       }
 
-      // Add player to game
-      const { error: playerError } = await supabase.from("players").insert({
-        game_id: gameId,
-        player_name: playerName.trim(),
-        position: nextPosition,
-        is_spectator: false,
-      })
-
-      if (playerError) throw playerError
-
-      // Update game player count (don't auto-start, let host decide)
-      await supabase
-        .from("games")
-        .update({
-          current_players: nextPosition + 1,
-          status: "waiting", // Always keep as waiting, let host start
-        })
-        .eq("id", gameId)
-
       toast.dismiss(loadingToast)
-      toast.success("成功加入观影房间！")
+      toast.success("成功加入游戏房间！")
       router.push(`/game/${gameId}?player=${encodeURIComponent(playerName.trim())}`)
+      
+      // 刷新游戏列表
+      fetchGames()
     } catch (error) {
       console.error("Error joining game:", error)
       toast.dismiss(loadingToast)
@@ -179,7 +162,7 @@ export function GameBrowser({ playerName }: GameBrowserProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <CNFLIXLogo size="sm" />
-            <CardTitle>观影房间</CardTitle>
+            <CardTitle>游戏房间</CardTitle>
           </div>
           <Button variant="outline" size="sm" onClick={refreshGames} disabled={isLoading}>
             <span className={`text-sm ${isLoading ? "animate-spin" : ""}`}>🔄</span>
@@ -191,7 +174,7 @@ export function GameBrowser({ playerName }: GameBrowserProps) {
           {/* 表头 */}
           <div className="grid grid-cols-5 gap-4 pb-2 border-b text-sm font-medium text-muted-foreground">
             <div>房间名称</div>
-            <div>观影者</div>
+            <div>玩家</div>
             <div>观众</div>
             <div>状态</div>
             <div>操作</div>
@@ -216,7 +199,7 @@ export function GameBrowser({ playerName }: GameBrowserProps) {
               <div className="flex gap-2">
                 {game.status === "waiting" && game.players < game.maxPlayers ? (
                   <Button size="sm" onClick={() => joinGame(game.id)} disabled={!playerName.trim()}>
-                    加入观影
+                    加入游戏
                   </Button>
                 ) : (
                   <Button
@@ -236,7 +219,7 @@ export function GameBrowser({ playerName }: GameBrowserProps) {
           {isLoading && <GameRoomSkeleton />}
 
           {games.length === 0 && !isLoading && (
-            <div className="text-center py-8 text-muted-foreground">暂无活跃观影房间，创建一个新房间开始吧！</div>
+            <div className="text-center py-8 text-muted-foreground">暂无活跃游戏房间，创建一个新房间开始吧！</div>
           )}
         </div>
       </CardContent>

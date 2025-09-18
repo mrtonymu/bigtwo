@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback } from "react"
 
-import { type Card as GameCard, type Player, type GameState, type PlayHistory, type CardHint, isValidPlay, createDeck, dealCards, sortCards, autoArrangeCards, getPlayTypeName, getCardHints } from "@/lib/game-logic"
+import { type Card as GameCard, type Player, type GameState, type PlayHistory, type CardHint, isValidPlay, createDeck, dealCards, sortCards, autoArrangeCards, getPlayTypeName, getCardHints, getAutoPlaySuggestion, shouldAutoPass } from "@/lib/game-logic"
+import { useErrorHandler } from '@/lib/utils/error-handler'
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { GameOptions, type GameOptions as GameOptionsType } from "@/components/game-options"
+import { GameOptions, type GameOptions as GameOptionsType, loadGameOptions } from "@/components/game-options"
 import Link from "next/link"
 import toast from "react-hot-toast"
 import { useSmartDataSync } from "@/lib/utils/database-optimizer"
@@ -18,7 +19,7 @@ import { type Theme } from "@/components/theme-selector"
 
 import { GameTableSkeleton } from "@/components/game-room-skeleton"
 import { CNFLIXLogo } from "@/components/cnflix-logo"
-import { useSoundEffects } from "@/components/sound-effects"
+import { useSoundEffects, SoundEffects } from "@/components/sound-effects"
 import { GameStats } from "@/components/game-stats"
 import { ThemeSelector, useTheme } from "@/components/theme-selector"
 import {
@@ -47,7 +48,7 @@ interface GameTableProps {
 }
 
 // 可拖拽的卡片组件
-function DraggableCard({ card, index, isSelected, onClick, currentTheme }: DraggableCardProps) {
+function DraggableCard({ card, index, isSelected, onClick, currentTheme, clickAnimation }: DraggableCardProps & { clickAnimation?: string }) {
   const {
     attributes,
     listeners,
@@ -76,17 +77,24 @@ function DraggableCard({ card, index, isSelected, onClick, currentTheme }: Dragg
       onClick={onClick}
       className={`playing-card ${suitClass} ${
         isSelected ? "selected" : ""
-      } modern-card-deal`}
+      } modern-card-deal enhanced-card-hover ${
+        isSelected ? 'enhanced-card-selected' : ''
+      } ${clickAnimation === `${card.suit}-${card.rank}` ? 'card-flip' : ''} 
+      w-full h-auto min-h-[60px] sm:min-h-[80px] 
+      text-xs sm:text-sm 
+      touch-manipulation 
+      active:scale-95 
+      transition-all duration-200`}
       data-animation-delay={index * 50}
     >
-      <div className="flex flex-col items-center">
-        <span className={`card-rank ${
+      <div className="flex flex-col items-center justify-center h-full p-1 sm:p-2">
+        <span className={`card-rank font-bold ${
           isRedSuit ? "text-red-600" : "text-gray-800"
         }`}>
           {card.display}
         </span>
         <span
-          className={`card-suit ${
+          className={`card-suit text-lg sm:text-xl ${
             isRedSuit ? "text-red-500" : "text-gray-700"
           }`}
         >
@@ -109,13 +117,20 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
   const [gameWinner, setGameWinner] = useState<string | null>(null)
   const [showOptions, setShowOptions] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const [gameOptions, setGameOptions] = useState<GameOptionsType>({
-    allowSpectators: true,
-    gameSpeed: "normal",
-    autoPass: false,
-    showCardCount: true,
-    cardSorting: "auto",
-    autoArrange: true,
+  const [gameOptions, setGameOptions] = useState<GameOptionsType>(() => {
+    // 在客户端加载保存的游戏选项
+    if (typeof window !== 'undefined') {
+      return loadGameOptions()
+    }
+    // 服务端渲染时使用默认值
+    return {
+      allowSpectators: true,
+      gameSpeed: "normal",
+      autoPass: false,
+      showCardCount: true,
+      cardSorting: "auto",
+      autoArrange: true,
+    }
   })
   const [showGameStart, setShowGameStart] = useState(false)
   const [isHost, setIsHost] = useState(false)
@@ -123,6 +138,25 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
   const [timeRemaining, setTimeRemaining] = useState<number>(0)
   const [cardHints, setCardHints] = useState<CardHint[]>([])
   const [showHints, setShowHints] = useState(false)
+  const [clickAnimation, setClickAnimation] = useState<string>("")
+  const [turnAnimation, setTurnAnimation] = useState<boolean>(false)
+  const [invalidPlayAnimation, setInvalidPlayAnimation] = useState<boolean>(false)
+
+  // 增强的动画效果
+  const triggerClickAnimation = useCallback((cardId: string) => {
+    setClickAnimation(cardId)
+    setTimeout(() => setClickAnimation(""), 300)
+  }, [])
+
+  const triggerTurnAnimation = useCallback(() => {
+    setTurnAnimation(true)
+    setTimeout(() => setTurnAnimation(false), 2000)
+  }, [])
+
+  const triggerInvalidPlayAnimation = useCallback(() => {
+    setInvalidPlayAnimation(true)
+    setTimeout(() => setInvalidPlayAnimation(false), 500)
+  }, [])
   const [showStats, setShowStats] = useState(false)
   const [showThemeSelector, setShowThemeSelector] = useState(false)
   const [isManualSort, setIsManualSort] = useState(false) // 跟踪是否手动排序
@@ -148,15 +182,23 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
   // 主题控制
   const { currentTheme, changeTheme } = useTheme()
 
-  // 音效控制
-  const { triggerCardSound, triggerWinSound, toggleBackgroundMusic, backgroundMusic, SoundEffects } = useSoundEffects()
+  // 错误处理
+  const { handleGameError, handleNetworkError, showSuccess, showLoading, dismissLoading } = useErrorHandler()
+  
+  // 音效
+  const { playClickSound, playSuccessSound, playErrorSound, backgroundMusic, toggleBackgroundMusic } = useSoundEffects()
 
   // 计算是否是我的回合
   const isMyTurn = gameState && myPosition !== -1 && gameState.currentPlayer === myPosition
 
   // 拖拽传感器
+  // 移动端传感器配置优化
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // 增加激活距离，避免误触
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -168,8 +210,8 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       fetchGameData()
     },
     onDisconnect: () => {
-      toast.error('连接断开，正在尝试重连...')
-    }
+        handleNetworkError(new Error('连接断开'))
+      }
   })
 
   // 计时器功能 - 使用安全的定时器防止内存泄漏
@@ -178,8 +220,12 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       const timer = safeSetTimeout(() => {
         setTimeRemaining(prev => {
           if (prev <= 1) {
-            // 时间到，自动跳过
-            handlePass()
+            // 时间到，根据设置决定是自动出牌还是跳过
+            if (gameOptions.autoPass) {
+              handleAutoPlay()
+            } else {
+              handlePass()
+            }
             return 0
           }
           return prev - 1
@@ -187,10 +233,21 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       }, 1000)
       return () => safeClearTimeout(timer)
     }
-  }, [turnTimer, timeRemaining, safeSetTimeout, safeClearTimeout])
+  }, [turnTimer, timeRemaining, safeSetTimeout, safeClearTimeout, gameOptions.autoPass])
+
+  // 根据游戏速度获取计时器时长
+  const getTimerDuration = (speed: string) => {
+    switch(speed) {
+      case 'slow': return 30    // 慢速：30秒
+      case 'normal': return 15  // 正常：15秒
+      case 'fast': return 10    // 快速：10秒
+      default: return 15        // 默认：15秒
+    }
+  }
 
   // 开始计时器
-  const startTurnTimer = (seconds: number = 30) => {
+  const startTurnTimer = (customSeconds?: number) => {
+    const seconds = customSeconds || getTimerDuration(gameOptions.gameSpeed)
     setTimeRemaining(seconds)
     setTurnTimer(Date.now())
   }
@@ -223,8 +280,13 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
     try {
       setIsLoading(true)
       
-      // 并行获取玩家和游戏状态数据
-      const [playersResult, gameStateResult] = await Promise.all([
+      // 并行获取游戏信息、玩家和游戏状态数据
+      const [gameResult, playersResult, gameStateResult] = await Promise.all([
+        supabase
+          .from("games")
+          .select("*")
+          .eq("id", gameId)
+          .single() as any,
         supabase
           .from("players")
           .select("*")
@@ -238,6 +300,11 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       ])
 
       if (playersResult.error) throw playersResult.error
+      
+      // 同步游戏选项
+      if (gameResult.data?.game_options) {
+        setGameOptions(gameResult.data.game_options)
+      }
       
       const playersData = playersResult.data || []
       const gameStateData = gameStateResult.data
@@ -294,7 +361,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       const winner = playersList.find((p: any) => p.cards.length === 0)
       if (winner && !gameWinner) {
         setGameWinner(winner.name)
-        triggerWinSound() // 播放获胜音效
+        playSuccessSound() // 播放获胜音效
         // Update game status to finished
         // @ts-ignore
         await supabase.from("games").update({ status: "finished" }).eq("id", gameId)
@@ -333,7 +400,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
         
         // 如果是我的回合，启动计时器
         if (newState.gameState && newState.gameState.currentPlayer === myPlayer.position) {
-          startTurnTimer(30) // 30秒出牌时间
+          startTurnTimer() // 使用游戏速度设置的时长
         } else {
           stopTurnTimer()
         }
@@ -350,7 +417,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       setIsLoading(false)
     } catch (error) {
       console.error("Error fetching game data:", error)
-      toast.error("获取游戏数据失败")
+        handleGameError(error, "获取游戏数据失败")
       setIsLoading(false)
     }
   }, [gameId, playerName, gameOptions.autoArrange, gameOptions.cardSorting, gameWinner])
@@ -366,6 +433,16 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
         "postgres_changes",
         { event: "*", schema: "public", table: "game_state", filter: `game_id=eq.${gameId}` },
         () => fetchGameData(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "games", filter: `id=eq.${gameId}` },
+        (payload) => {
+          // 实时同步游戏选项变更
+          if (payload.new && (payload.new as any).game_options) {
+            setGameOptions((payload.new as any).game_options)
+          }
+        }
       )
       .subscribe()
 
@@ -386,56 +463,170 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
   const saveCardsToDatabase = async (cards: GameCard[], action: string) => {
     try {
       saveCardsSmartly(cards) // 使用智能同步，自动防抖和去重
-      toast.success(`${action}完成`)
+      showSuccess(`${action}完成`)
       return true
     } catch (error) {
       console.error(`Error saving cards after ${action}:`, error)
-      toast.error(`保存${action}失败`)
+      handleGameError(error, `保存${action}失败`)
       return false
     }
   }
 
-  // 处理拖拽结束
+  // 处理拖拽结束 - 优化版本
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
 
     if (active.id !== over?.id) {
-      const oldIndex = myCards.findIndex(card => 
-        card.suit + '-' + card.rank + '-' + myCards.indexOf(card) === active.id
+      // 优化索引查找，避免重复计算
+      const activeId = active.id as string
+      const overId = over?.id as string
+      
+      const oldIndex = myCards.findIndex((card, index) => 
+        `${card.suit}-${card.rank}` === activeId.split('-').slice(0, 2).join('-')
       )
-      const newIndex = myCards.findIndex(card => 
-        card.suit + '-' + card.rank + '-' + myCards.indexOf(card) === over?.id
+      const newIndex = myCards.findIndex((card, index) => 
+        `${card.suit}-${card.rank}` === overId?.split('-').slice(0, 2).join('-')
       )
 
-      if (oldIndex !== -1 && newIndex !== -1) {
+      if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
         const newCards = arrayMove(myCards, oldIndex, newIndex)
         setMyCards(newCards)
         setIsManualSort(true) // 标记为手动排序
         
-        // 保存新的排序到数据库
-        await saveCardsToDatabase(newCards, "手牌重新排序")
+        // 使用防抖保存，避免频繁数据库操作
+        saveCardsSmartly(newCards)
       }
     }
   }
 
-  const handleCardClick = (card: GameCard) => {
+  const handleCardClick = useCallback((card: GameCard) => {
+    // 播放点击音效
+    playClickSound()
+    
+    // 触发点击动画
+    triggerClickAnimation(`${card.suit}-${card.rank}`)
+    
     // 添加点击反馈动画
-    const cardElement = document.querySelector(`[data-card-id="${card.suit}-${card.rank}"]`)
-    if (cardElement) {
-      cardElement.classList.add('card-selected')
-      setTimeout(() => {
-        cardElement.classList.remove('card-selected')
-      }, 300)
-    }
+    requestAnimationFrame(() => {
+      const cardElement = document.querySelector(`[data-card-id="${card.suit}-${card.rank}"]`)
+      if (cardElement) {
+        cardElement.classList.add('enhanced-button-feedback')
+        setTimeout(() => {
+          cardElement.classList.remove('enhanced-button-feedback')
+        }, 300)
+      }
+    })
 
-    setSelectedCards((prev) => {
-      const isSelected = prev.some((c) => c.suit === card.suit && c.rank === card.rank)
+    setSelectedCards(prev => {
+      const isSelected = prev.some(c => c.suit === card.suit && c.rank === card.rank)
       if (isSelected) {
-        return prev.filter((c) => !(c.suit === card.suit && c.rank === card.rank))
+        return prev.filter(c => !(c.suit === card.suit && c.rank === card.rank))
       } else {
         return [...prev, card]
       }
     })
+  }, [triggerClickAnimation, playClickSound])
+
+  // 智能自动出牌
+  const handleAutoPlay = async () => {
+    if (!gameState) return
+
+    try {
+      // 检查是否应该自动跳过
+      if (shouldAutoPass(myCards, gameState.lastPlay, players.length)) {
+        await handlePass()
+        return
+      }
+
+      // 获取智能出牌建议
+      const suggestedCards = getAutoPlaySuggestion(myCards, gameState.lastPlay, players.length)
+      
+      if (!suggestedCards || suggestedCards.length === 0) {
+        await handlePass()
+        return
+      }
+
+      // 自动选择建议的牌并出牌
+      setSelectedCards(suggestedCards)
+      
+      // 延迟一点时间让用户看到选择的牌，然后自动出牌
+      setTimeout(async () => {
+        // 验证出牌
+        const remainingCards = myCards.filter(
+          (card) => !suggestedCards.some((selected) => selected.suit === card.suit && selected.rank === card.rank),
+        )
+
+        if (!isValidPlay(suggestedCards, gameState.lastPlay, players.length, remainingCards)) {
+          await handlePass()
+          return
+        }
+
+        // 执行出牌逻辑（复用handlePlay的逻辑）
+        const newCards = myCards.filter(
+          (card) => !suggestedCards.some((selected) => selected.suit === card.suit && selected.rank === card.rank),
+        )
+
+        // 更新玩家手牌
+        // @ts-ignore
+        const { error: playerError } = await supabase
+          .from("players")
+          // @ts-ignore
+          .update({ cards: newCards })
+          .eq("game_id", gameId)
+          .eq("player_name", playerName)
+
+        if (playerError) {
+          console.error("Error updating player cards:", playerError)
+          toast.error("自动出牌失败")
+          return
+        }
+
+        // 更新游戏状态
+        const nextPlayer = (gameState.currentPlayer + 1) % players.length
+        const playHistory = gameState.playHistory || []
+        const newPlayHistory = [
+          ...playHistory,
+          {
+            turn: gameState.turnCount + 1,
+            playerName: playerName,
+            playerPosition: myPosition,
+            cards: suggestedCards,
+            playType: getPlayTypeName(suggestedCards),
+            timestamp: new Date().toISOString(),
+          }
+        ]
+        
+        // @ts-ignore
+        const { error: gameStateError } = await supabase
+          .from("game_state")
+          // @ts-ignore
+          .update({
+            current_player: nextPlayer,
+            last_play: suggestedCards,
+            last_player: myPosition,
+            turn_count: gameState.turnCount + 1,
+            play_history: newPlayHistory,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("game_id", gameId)
+
+        if (gameStateError) {
+          console.error("Error updating game state:", gameStateError)
+          toast.error("更新游戏状态失败")
+          return
+        }
+
+        setSelectedCards([])
+        stopTurnTimer()
+        playSuccessSound()
+        showSuccess("自动出牌成功！")
+      }, 1000) // 1秒延迟让用户看到选择的牌
+      
+    } catch (error) {
+      console.error("Error in auto play:", error)
+      toast.error("自动出牌失败，改为跳过")
+      await handlePass()
+    }
   }
 
   const handlePlay = async () => {
@@ -449,6 +640,8 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
 
       // Validate play
       if (!isValidPlay(selectedCards, gameState.lastPlay, players.length, remainingCards)) {
+        triggerInvalidPlayAnimation()
+        playErrorSound()
         if (remainingCards.length === 1 && remainingCards[0].suit === "spades") {
           toast.error("不能留下单张♠作为最后一张牌！")
         } else {
@@ -514,8 +707,8 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
 
       setSelectedCards([])
       stopTurnTimer() // 停止计时器
-      triggerCardSound() // 播放出牌音效
-      toast.success("出牌成功！")
+      playSuccessSound() // 播放成功音效
+      showSuccess("出牌成功！")
     } catch (error) {
       console.error("Error playing cards:", error)
       toast.error("出牌失败，请重试")
@@ -713,53 +906,84 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b">
-        <div className="max-w-6xl mx-auto px-4 py-4">
+      <header className="bg-white border-b sticky top-0 z-40">
+        <div className="max-w-6xl mx-auto px-2 sm:px-4 py-2 sm:py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" asChild>
-                <Link href="/">← 返回大厅</Link>
+            {/* 左侧：返回按钮和Logo */}
+            <div className="flex items-center gap-2 sm:gap-4">
+              <Button variant="ghost" asChild size="sm" className="enhanced-button-feedback">
+                <Link href="/" className="text-xs sm:text-sm">
+                  <span className="hidden sm:inline">← 返回大厅</span>
+                  <span className="sm:hidden">←</span>
+                </Link>
               </Button>
-              <CNFLIXLogo size="md" />
+              <div className="hidden sm:block">
+                <CNFLIXLogo size="md" />
+              </div>
+              <div className="sm:hidden">
+                <CNFLIXLogo size="sm" />
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button onClick={toggleBackgroundMusic} variant="outline" size="sm">
-                {backgroundMusic ? "🔇" : "🎵"}
-              </Button>
-              <Button onClick={() => setShowStats(true)} variant="outline" size="sm">
-                📊 统计
-              </Button>
-              <Button onClick={() => setShowThemeSelector(true)} variant="outline" size="sm">
-                🎨 主题
-              </Button>
-              {timeRemaining > 0 && (
-                <div className="flex items-center gap-2 px-3 py-1 bg-red-100 rounded-full">
-                  <span className="text-sm font-medium text-red-700">
-                    ⏰ {timeRemaining}s
-                  </span>
-                </div>
-              )}
-            </div>
-            <div className="flex items-center gap-4">
+
+            {/* 中间：时间倒计时（移动端优先显示） */}
+            {timeRemaining > 0 && (
+              <div className="flex items-center gap-2 px-2 sm:px-3 py-1 bg-red-100 rounded-full">
+                <span className="text-xs sm:text-sm font-medium text-red-700">
+                  ⏰ {timeRemaining}s
+                </span>
+              </div>
+            )}
+
+            {/* 右侧：功能按钮 */}
+            <div className="flex items-center gap-1 sm:gap-2">
+              {/* 移动端：合并按钮组 */}
+              <div className="flex items-center gap-1 sm:hidden">
+                <Button onClick={toggleBackgroundMusic} variant="outline" size="sm" className="enhanced-button-feedback p-2">
+                  {backgroundMusic ? "🔇" : "🎵"}
+                </Button>
+                <Button onClick={() => setShowStats(true)} variant="outline" size="sm" className="enhanced-button-feedback p-2">
+                  📊
+                </Button>
+                <Button onClick={() => setShowThemeSelector(true)} variant="outline" size="sm" className="enhanced-button-feedback p-2">
+                  🎨
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setShowOptions(true)} className="enhanced-button-feedback p-2">
+                  ⚙️
+                </Button>
+              </div>
+
+              {/* 桌面端：完整按钮 */}
+              <div className="hidden sm:flex items-center gap-2">
+                <Button onClick={toggleBackgroundMusic} variant="outline" size="sm" className="enhanced-button-feedback">
+                  {backgroundMusic ? "🔇" : "🎵"}
+                </Button>
+                <Button onClick={() => setShowStats(true)} variant="outline" size="sm" className="enhanced-button-feedback">
+                  📊 统计
+                </Button>
+                <Button onClick={() => setShowThemeSelector(true)} variant="outline" size="sm" className="enhanced-button-feedback">
+                  🎨 主题
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setShowOptions(true)} className="enhanced-button-feedback">
+                  <span className="mr-2">⚙️</span>
+                  观影设置
+                </Button>
+              </div>
+
               {/* 连接状态指示器 */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 sm:gap-2">
                 <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-                <span className="text-sm text-gray-600">
+                <span className="hidden sm:inline text-sm text-gray-600">
                   {isConnected ? '已连接' : '连接断开'}
                 </span>
                 {isReconnecting && (
-                  <span className="text-sm text-blue-600">重连中...</span>
+                  <span className="text-xs sm:text-sm text-blue-600">重连中...</span>
                 )}
                 {!isConnected && !isReconnecting && (
-                  <Button size="sm" variant="outline" onClick={manualReconnect}>
+                  <Button size="sm" variant="outline" onClick={manualReconnect} className="enhanced-button-feedback text-xs sm:text-sm">
                     重连
                   </Button>
                 )}
               </div>
-              <Button variant="ghost" size="sm" onClick={() => setShowOptions(true)}>
-                <span className="mr-2">⚙️</span>
-                观影设置
-              </Button>
             </div>
           </div>
         </div>
@@ -793,8 +1017,8 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
                 }`}
                 style={{ animationDelay: `${index * 200}ms` }}
               >
-                <CardContent className="p-3 sm:p-4 text-center">
-                  <h3 className="font-medium mb-2 transition-all duration-300 text-sm sm:text-base">{player.name}</h3>
+                <CardContent className="p-2 sm:p-3 lg:p-4 text-center">
+                  <h3 className="font-medium mb-1 sm:mb-2 transition-all duration-300 text-xs sm:text-sm lg:text-base truncate">{player.name}</h3>
                   <div className="flex flex-col sm:flex-row justify-center items-center gap-1 sm:gap-2">
                     {gameOptions.showCardCount && (
                       <Badge 
@@ -908,39 +1132,39 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={async () => {
+                  onClick={() => {
                     const sorted = sortCards(myCards, "suit")
                     setMyCards(sorted)
                     setIsManualSort(true) // 标记为手动排序
-                    await saveCardsToDatabase(sorted, "按花色排序")
+                    saveCardsSmartly(sorted) // 使用智能同步
                   }}
-                  className="text-xs"
+                  className="text-xs enhanced-button-feedback"
                 >
                   ♠️ 花色
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={async () => {
+                  onClick={() => {
                     const sorted = sortCards(myCards, "rank")
                     setMyCards(sorted)
                     setIsManualSort(true) // 标记为手动排序
-                    await saveCardsToDatabase(sorted, "按点数排序")
+                    saveCardsSmartly(sorted) // 使用智能同步
                   }}
-                  className="text-xs"
+                  className="text-xs enhanced-button-feedback"
                 >
                   🔢 点数
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={async () => {
+                  onClick={() => {
                     const arranged = autoArrangeCards(myCards)
                     setMyCards(arranged)
                     setIsManualSort(true) // 标记为手动排序
-                    await saveCardsToDatabase(arranged, "自动整理")
+                    saveCardsSmartly(arranged) // 使用智能同步
                   }}
-                  className="text-xs"
+                  className="text-xs enhanced-button-feedback"
                 >
                   🎯 整理
                 </Button>
@@ -957,50 +1181,77 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
                 items={myCards.map((card, index) => card.suit + '-' + card.rank + '-' + index)}
                 strategy={verticalListSortingStrategy}
               >
-                <div className="flex flex-wrap justify-center gap-1 sm:gap-2 mb-4 sm:mb-6">
-                  {myCards.map((card, index) => (
-                    <DraggableCard
-                      key={`${card.suit}-${card.rank}-${index}`}
-                      card={card}
-                      index={index}
-                      isSelected={selectedCards.some((c) => c.suit === card.suit && c.rank === card.rank)}
-                      onClick={() => handleCardClick(card)}
-                      currentTheme={currentTheme}
-                    />
-                  ))}
+                <div className="flex flex-wrap justify-center gap-1 sm:gap-2 mb-4 sm:mb-6 px-1 sm:px-0">
+                  {myCards.map((card, index) => {
+                    // 移动端动态卡牌大小计算
+                    const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
+                    const cardWidth = isMobile 
+                      ? Math.max(40, Math.min(60, (window.innerWidth - 32) / Math.max(13, myCards.length)))
+                      : 60
+                    
+                    return (
+                      <div 
+                        key={`${card.suit}-${card.rank}`}
+                        className="touch-manipulation gpu-accelerated"
+                        style={{ 
+                          minWidth: '40px',
+                          maxWidth: '60px',
+                          width: `${cardWidth}px`
+                        }}
+                      >
+                        <DraggableCard
+                          card={card}
+                          index={index}
+                          isSelected={selectedCards.some(c => c.suit === card.suit && c.rank === card.rank)}
+                          onClick={() => handleCardClick(card)}
+                          currentTheme={currentTheme}
+                          clickAnimation={clickAnimation}
+                        />
+                      </div>
+                    )
+                  })}
                 </div>
               </SortableContext>
             </DndContext>
 
             {isMyTurn ? (
               <div className="flex flex-col items-center gap-3">
-                <div className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-3 w-full">
+                {/* 移动端：垂直布局的操作按钮 */}
+                <div className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-3 w-full max-w-md sm:max-w-none">
                   <Button 
                     onClick={handlePlay} 
                     disabled={selectedCards.length === 0} 
-                    className={`px-4 sm:px-6 py-2 sm:py-3 transition-all duration-300 text-sm sm:text-base ${
+                    className={`px-4 sm:px-6 py-3 sm:py-3 transition-all duration-300 text-sm sm:text-base enhanced-button-feedback ${
                       selectedCards.length > 0 
-                        ? 'play-button bg-green-600 hover:bg-green-700 shadow-lg' 
+                        ? 'play-button bg-green-600 hover:bg-green-700 shadow-lg hover:shadow-xl transform hover:scale-105' 
                         : 'bg-gray-400'
-                    }`}
+                    } touch-manipulation min-h-[48px] sm:min-h-auto`}
                   >
-                    <span className="hidden sm:inline">Play Cards</span>
-                    <span className="sm:hidden">出牌</span> ({selectedCards.length})
+                    <span className="flex items-center justify-center gap-2">
+                      <span>出牌</span>
+                      <span className="bg-white/20 px-2 py-1 rounded-full text-xs">
+                        {selectedCards.length}
+                      </span>
+                    </span>
                   </Button>
-                  <div className="flex gap-2">
+                  
+                  <div className="flex gap-2 w-full sm:w-auto">
                     <Button 
                       onClick={handlePass} 
                       variant="outline" 
-                      className="px-4 sm:px-6 py-2 sm:py-3 bg-transparent hover:bg-gray-100 transition-all duration-300 text-sm sm:text-base flex-1"
+                      className="px-4 sm:px-6 py-3 sm:py-3 bg-transparent hover:bg-gray-100 transition-all duration-300 text-sm sm:text-base flex-1 sm:flex-none enhanced-button-feedback hover:shadow-lg transform hover:scale-105 touch-manipulation min-h-[48px] sm:min-h-auto"
                     >
                       Pass
                     </Button>
                     <Button 
                       onClick={() => setShowHints(!showHints)} 
                       variant="outline"
-                      className="px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base flex-1"
+                      className="px-4 sm:px-6 py-3 sm:py-3 text-sm sm:text-base flex-1 sm:flex-none enhanced-button-feedback hover:shadow-lg transform hover:scale-105 touch-manipulation min-h-[48px] sm:min-h-auto"
                     >
-                      💡
+                      <span className="flex items-center gap-1">
+                        <span>💡</span>
+                        <span className="hidden sm:inline">提示</span>
+                      </span>
                     </Button>
                   </div>
                 </div>
@@ -1093,7 +1344,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
           </CardContent>
         </Card>
 
-        <GameOptions isOpen={showOptions} onClose={() => setShowOptions(false)} onSave={setGameOptions} />
+        <GameOptions isOpen={showOptions} onClose={() => setShowOptions(false)} onSave={setGameOptions} gameId={gameId} />
         
         {/* 游戏统计 */}
         <GameStats 
@@ -1111,7 +1362,11 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
         />
         
         {/* 音效组件 */}
-        <SoundEffects />
+        <SoundEffects 
+          playCardSound={false}
+          winSound={false}
+          backgroundMusic={backgroundMusic}
+        />
       </div>
     </div>
   )

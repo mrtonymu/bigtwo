@@ -13,6 +13,14 @@ export interface Database {
           max_players: number
           current_players: number
           spectators: number
+          game_options?: {
+            allowSpectators: boolean
+            gameSpeed: "slow" | "normal" | "fast"
+            autoPass: boolean
+            showCardCount: boolean
+            cardSorting: "auto" | "suit" | "rank"
+            autoArrange: boolean
+          }
           created_at: string
           updated_at: string
         }
@@ -23,6 +31,14 @@ export interface Database {
           max_players?: number
           current_players?: number
           spectators?: number
+          game_options?: {
+            allowSpectators: boolean
+            gameSpeed: "slow" | "normal" | "fast"
+            autoPass: boolean
+            showCardCount: boolean
+            cardSorting: "auto" | "suit" | "rank"
+            autoArrange: boolean
+          }
           created_at?: string
           updated_at?: string
         }
@@ -33,6 +49,14 @@ export interface Database {
           max_players?: number
           current_players?: number
           spectators?: number
+          game_options?: {
+            allowSpectators: boolean
+            gameSpeed: "slow" | "normal" | "fast"
+            autoPass: boolean
+            showCardCount: boolean
+            cardSorting: "auto" | "suit" | "rank"
+            autoArrange: boolean
+          }
           created_at?: string
           updated_at?: string
         }

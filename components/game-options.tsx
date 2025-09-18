@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
@@ -11,6 +11,7 @@ interface GameOptionsProps {
   isOpen: boolean
   onClose: () => void
   onSave: (options: GameOptions) => void
+  gameId?: string // 添加游戏ID用于多玩家同步
 }
 
 export interface GameOptions {
@@ -22,19 +23,80 @@ export interface GameOptions {
   autoArrange: boolean
 }
 
-export function GameOptions({ isOpen, onClose, onSave }: GameOptionsProps) {
-  const [options, setOptions] = useState<GameOptions>({
-    allowSpectators: true,
-    gameSpeed: "normal",
-    autoPass: false,
-    showCardCount: true,
-    cardSorting: "auto",
-    autoArrange: true,
-  })
+// 默认游戏选项
+const defaultOptions: GameOptions = {
+  allowSpectators: true,
+  gameSpeed: "normal",
+  autoPass: false,
+  showCardCount: true,
+  cardSorting: "auto",
+  autoArrange: true,
+}
+
+// 从本地存储加载游戏选项
+export const loadGameOptions = (): GameOptions => {
+  if (typeof window === 'undefined') return defaultOptions
+  
+  try {
+    const saved = localStorage.getItem('big-two-game-options')
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      // 确保所有必需的字段都存在
+      return { ...defaultOptions, ...parsed }
+    }
+  } catch (error) {
+    console.error('Error loading game options:', error)
+  }
+  
+  return defaultOptions
+}
+
+// 保存游戏选项到本地存储
+const saveGameOptions = (options: GameOptions) => {
+  if (typeof window === 'undefined') return
+  
+  try {
+    localStorage.setItem('big-two-game-options', JSON.stringify(options))
+  } catch (error) {
+    console.error('Error saving game options:', error)
+  }
+}
+
+export function GameOptions({ isOpen, onClose, onSave, gameId }: GameOptionsProps) {
+  const [options, setOptions] = useState<GameOptions>(defaultOptions)
+
+  // 组件挂载时加载保存的选项
+  useEffect(() => {
+    const savedOptions = loadGameOptions()
+    setOptions(savedOptions)
+  }, [])
 
   if (!isOpen) return null
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    // 保存到本地存储
+    saveGameOptions(options)
+    
+    // 如果有gameId，同步到服务器
+    if (gameId) {
+      try {
+        const response = await fetch(`/api/games/${gameId}/options`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ gameOptions: options }),
+        })
+        
+        if (!response.ok) {
+          console.error('Failed to sync game options to server')
+        }
+      } catch (error) {
+        console.error('Error syncing game options:', error)
+      }
+    }
+    
+    // 通知父组件
     onSave(options)
     onClose()
   }

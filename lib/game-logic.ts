@@ -62,15 +62,17 @@ export function shuffleDeck(deck: Card[]): Card[] {
   return shuffled
 }
 
-// Sort cards by suit and rank
+// Sort cards by suit and rank - 优化版本
 export function sortCards(cards: Card[], sortBy: "suit" | "rank" | "auto" = "auto"): Card[] {
+  if (cards.length === 0) return []
+  
   const sorted = [...cards]
+  const suitOrder = { spades: 3, hearts: 2, clubs: 1, diamonds: 0 }
   
   if (sortBy === "suit") {
     // Sort by suit first, then by rank
     // 在大老二中，花色优先级：黑桃 > 红桃 > 梅花 > 方块
     return sorted.sort((a, b) => {
-      const suitOrder = { spades: 3, hearts: 2, clubs: 1, diamonds: 0 }
       if (suitOrder[a.suit] !== suitOrder[b.suit]) {
         return suitOrder[b.suit] - suitOrder[a.suit] // 降序，黑桃最大
       }
@@ -82,7 +84,6 @@ export function sortCards(cards: Card[], sortBy: "suit" | "rank" | "auto" = "aut
       if (a.rank !== b.rank) {
         return a.rank - b.rank
       }
-      const suitOrder = { spades: 3, hearts: 2, clubs: 1, diamonds: 0 }
       return suitOrder[b.suit] - suitOrder[a.suit] // 降序，黑桃最大
     })
   } else {
@@ -91,39 +92,40 @@ export function sortCards(cards: Card[], sortBy: "suit" | "rank" | "auto" = "aut
       if (a.rank !== b.rank) {
         return a.rank - b.rank
       }
-      const suitOrder = { spades: 3, hearts: 2, clubs: 1, diamonds: 0 }
       return suitOrder[b.suit] - suitOrder[a.suit] // 降序，黑桃最大
     })
   }
 }
 
-// Auto arrange cards by grouping similar cards together
+// Auto arrange cards by grouping similar cards together - 优化版本
 export function autoArrangeCards(cards: Card[]): Card[] {
+  if (cards.length === 0) return []
+  
   const sorted = [...cards]
   
-  // Group cards by suit
-  const suitGroups: { [key: string]: Card[] } = {
-    spades: [],
-    hearts: [],
-    diamonds: [],
-    clubs: []
-  }
+  // 使用Map提高性能，避免重复创建对象
+  const suitGroups = new Map<string, Card[]>([
+    ['spades', []],
+    ['hearts', []],
+    ['diamonds', []],
+    ['clubs', []]
+  ])
   
+  // 一次遍历分组
   sorted.forEach(card => {
-    suitGroups[card.suit].push(card)
+    suitGroups.get(card.suit)?.push(card)
   })
   
-  // Sort each suit group by rank
-  Object.keys(suitGroups).forEach(suit => {
-    suitGroups[suit].sort((a, b) => a.rank - b.rank)
-  })
-  
-  // Combine groups in order: spades, hearts, diamonds, clubs
+  // 对每个花色组内排序，并合并结果
   const result: Card[] = []
-  const suitOrder = ["spades", "hearts", "diamonds", "clubs"] as const
+  const suitOrder = ['spades', 'hearts', 'diamonds', 'clubs']
   
   suitOrder.forEach(suit => {
-    result.push(...suitGroups[suit])
+    const group = suitGroups.get(suit)
+    if (group && group.length > 0) {
+      group.sort((a, b) => a.rank - b.rank)
+      result.push(...group)
+    }
   })
   
   return result
@@ -787,6 +789,48 @@ function findFourOfAKindPlusOne(cards: Card[]): CardHint[] {
   })
   
   return fourPlusOnes
+}
+
+// 智能自动出牌功能
+export function getAutoPlaySuggestion(myCards: Card[], lastPlay: Card[], playerCount: number): Card[] | null {
+  // 如果没有上一次出牌，选择最小的单张
+  if (!lastPlay || lastPlay.length === 0) {
+    const sortedCards = sortCards(myCards, "rank")
+    return [sortedCards[0]]
+  }
+
+  // 获取所有可能的出牌提示
+  const hints = getCardHints(myCards, lastPlay, playerCount)
+  
+  if (hints.length === 0) {
+    return null // 无法出牌，应该跳过
+  }
+
+  // 智能选择策略：
+  // 1. 优先出最小的有效牌组
+  // 2. 如果有多个选择，选择能清空最多手牌的
+  // 3. 避免拆散强力牌组（如炸弹、同花顺等）
+  
+  let bestHint = hints[0]
+  
+  for (const hint of hints) {
+    // 优先选择强度最低的有效出牌（保守策略）
+    if (hint.strength < bestHint.strength) {
+      bestHint = hint
+    }
+    // 如果强度相同，选择牌数更多的（清牌策略）
+    else if (hint.strength === bestHint.strength && hint.cards.length > bestHint.cards.length) {
+      bestHint = hint
+    }
+  }
+  
+  return bestHint.cards
+}
+
+// 检查是否应该自动跳过
+export function shouldAutoPass(myCards: Card[], lastPlay: Card[], playerCount: number): boolean {
+  const hints = getCardHints(myCards, lastPlay, playerCount)
+  return hints.length === 0
 }
 
 function findStraightFlushes(cards: Card[]): CardHint[] {

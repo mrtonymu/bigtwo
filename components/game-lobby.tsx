@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { GameBrowser } from "@/components/game-browser"
-import { GameOptions, type GameOptions as GameOptionsType } from "@/components/game-options"
+import { GameOptions, type GameOptions as GameOptionsType, loadGameOptions } from "@/components/game-options"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { useErrorHandler } from "@/lib/utils/error-handler"
@@ -18,13 +18,20 @@ export function GameLobby() {
   const [gameName, setGameName] = useState("")
   const [isCreating, setIsCreating] = useState(false)
   const [showOptions, setShowOptions] = useState(false)
-  const [gameOptions, setGameOptions] = useState<GameOptionsType>({
-    allowSpectators: true,
-    gameSpeed: "normal",
-    autoPass: false,
-    showCardCount: true,
-    cardSorting: "auto",
-    autoArrange: true,
+  const [gameOptions, setGameOptions] = useState<GameOptionsType>(() => {
+    // 在客户端加载保存的游戏选项
+    if (typeof window !== 'undefined') {
+      return loadGameOptions()
+    }
+    // 服务端渲染时使用默认值
+    return {
+      allowSpectators: true,
+      gameSpeed: "normal",
+      autoPass: false,
+      showCardCount: true,
+      cardSorting: "auto",
+      autoArrange: true,
+    }
   })
   const supabase = createClient()
   const { handleSupabaseError } = useErrorHandler()
@@ -37,12 +44,12 @@ export function GameLobby() {
     const roomNameValidation = validateRoomName(gameName)
     
     if (!playerNameValidation.isValid) {
-      handleSupabaseError(new Error(playerNameValidation.errors[0]), "玩家名称验证")
+      toast.error(playerNameValidation.errors[0])
       return
     }
     
     if (!roomNameValidation.isValid) {
-      handleSupabaseError(new Error(roomNameValidation.errors[0]), "房间名称验证")
+      toast.error(roomNameValidation.errors[0])
       return
     }
 
@@ -51,47 +58,61 @@ export function GameLobby() {
     const sanitizedRoomName = InputSanitizer.sanitizeRoomName(gameName)
 
     setIsCreating(true)
-    const loadingToast = toast.loading("正在创建观影房间...")
+    const loadingToast = toast.loading("正在创建游戏房间...")
     
     try {
-      // Create new game
-      // 临时使用 any 类型断言，等待 Supabase 类型配置完善
-      const { data: gameData, error: gameError } = await (supabase as any)
-        .from("games")
-        .insert({
+      // 使用新的API路由创建游戏
+      const createGameResponse = await fetch('/api/games', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           name: sanitizedRoomName,
-          status: "waiting" as const,
-          max_players: 4,
-          current_players: 1,
+          maxPlayers: 4,
+          allowSpectators: gameOptions.allowSpectators,
+          gameOptions: gameOptions
         })
-        .select()
-        .single()
+      })
 
-      if (gameError) {
-        handleSupabaseError(gameError, "创建游戏")
+      const createGameResult = await createGameResponse.json()
+
+      if (!createGameResult.success) {
+        toast.error(createGameResult.error || '创建游戏失败')
         return
       }
 
-      const { error: playerError } = await (supabase as any).from("players").insert({
-        game_id: gameData!.id,
-        player_name: sanitizedPlayerName,
-        position: 0,
-        is_spectator: false,
+      const gameData = createGameResult.data
+
+      // 添加玩家到游戏
+      const joinGameResponse = await fetch(`/api/games/${gameData.id}/players`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          playerName: sanitizedPlayerName,
+          isSpectator: false
+        })
       })
 
-      if (playerError) {
-        handleSupabaseError(playerError, "添加玩家")
+      const joinGameResult = await joinGameResponse.json()
+
+      if (!joinGameResult.success) {
+        toast.error(joinGameResult.error || '加入游戏失败')
         return
       }
 
       toast.dismiss(loadingToast)
-      toast.success("观影房间创建成功！")
+      toast.success("游戏房间创建成功！")
       
       // Navigate to game
-      router.push(`/game/${gameData!.id}?player=${encodeURIComponent(sanitizedPlayerName)}`)
+      router.push(`/game/${gameData.id}?player=${encodeURIComponent(sanitizedPlayerName)}`)
     } catch (error) {
-      handleSupabaseError(error, "创建房间")
+      console.error('创建游戏失败:', error)
+      toast.error('创建游戏失败，请重试')
     } finally {
+      toast.dismiss(loadingToast)
       setIsCreating(false)
     }
   }

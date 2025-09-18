@@ -1,0 +1,224 @@
+/* 移动端优化样式 */
+
+/* 触摸优化 */
+.touch-manipulation {
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* 移动端卡牌优化 */
+@media (max-width: 640px) {
+  .playing-card {
+    min-height: 60px;
+    font-size: 0.75rem;
+    padding: 0.25rem;
+  }
+  
+  .playing-card .card-rank {
+    font-size: 0.875rem;
+    font-weight: bold;
+  }
+  
+  .playing-card .card-suit {
+    font-size: 1rem;
+  }
+  
+  /* 增强触摸反馈 */
+  .playing-card:active {
+    transform: scale(0.95);
+    transition: transform 0.1s ease;
+  }
+  
+  /* 选中状态优化 */
+  .playing-card.selected {
+    transform: translateY(-8px) scale(1.05);
+    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+  }
+}
+
+/* 移动端按钮优化 */
+@media (max-width: 640px) {
+  .enhanced-button-feedback {
+    min-height: 48px;
+    font-size: 0.875rem;
+    padding: 0.75rem 1rem;
+  }
+  
+  /* 增强触摸反馈 */
+  .enhanced-button-feedback:active {
+    transform: scale(0.95);
+    transition: transform 0.1s ease;
+  }
+}
+
+/* 移动端头部导航优化 */
+@media (max-width: 640px) {
+  .sticky {
+    position: -webkit-sticky;
+    position: sticky;
+  }
+  
+  /* 紧凑的头部布局 */
+  header {
+    padding: 0.5rem 0.5rem;
+  }
+  
+  /* 按钮组优化 */
+  .mobile-button-group {
+    display: flex;
+    gap: 0.25rem;
+  }
+  
+  .mobile-button-group button {
+    padding: 0.5rem;
+    min-width: 40px;
+    min-height: 40px;
+  }
+}
+
+/* 移动端游戏区域优化 */
+@media (max-width: 640px) {
+  /* 手牌区域 */
+  .hand-area {
+    padding: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  
+  /* 玩家卡片 */
+  .player-card {
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .player-card h3 {
+    font-size: 0.75rem;
+    margin-bottom: 0.25rem;
+  }
+  
+  /* 游戏状态卡片 */
+  .game-status-card {
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+  }
+  
+  .game-status-card .card-title {
+    font-size: 1rem;
+  }
+}
+
+/* 移动端提示区域优化 */
+@media (max-width: 640px) {
+  .hints-area {
+    padding: 0.75rem;
+  }
+  
+  .hint-card {
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+  }
+  
+  .hint-card button {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+    min-height: 36px;
+  }
+}
+
+/* 移动端模态框优化 */
+@media (max-width: 640px) {
+  .modal-content {
+    margin: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+  }
+  
+  .modal-header {
+    padding: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  
+  .modal-body {
+    padding: 1rem;
+  }
+  
+  .modal-footer {
+    padding: 1rem;
+    border-top: 1px solid #e5e7eb;
+  }
+}
+
+/* 移动端滚动优化 */
+@media (max-width: 640px) {
+  .scrollable-area {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+  
+  /* 隐藏滚动条但保持功能 */
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* 移动端动画优化 */
+@media (max-width: 640px) and (prefers-reduced-motion: no-preference) {
+  /* 减少动画强度 */
+  .enhanced-card-hover:hover {
+    transform: translateY(-4px) scale(1.02);
+  }
+  
+  .enhanced-card-selected {
+    transform: translateY(-6px) scale(1.04);
+  }
+  
+  /* 快速过渡 */
+  .quick-transition {
+    transition: all 0.2s ease;
+  }
+}
+
+/* 移动端无障碍优化 */
+@media (max-width: 640px) {
+  /* 增大可点击区域 */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* 高对比度模式支持 */
+  @media (prefers-contrast: high) {
+    .playing-card {
+      border: 2px solid;
+    }
+    
+    .playing-card.selected {
+      border-color: #000;
+      background-color: #fff;
+    }
+  }
+}
+
+/* 移动端性能优化 */
+@media (max-width: 640px) {
+  /* 使用 transform 而不是改变 layout 属性 */
+  .gpu-accelerated {
+    transform: translateZ(0);
+    will-change: transform;
+  }
+  
+  /* 减少重绘 */
+  .contain-layout {
+    contain: layout style paint;
+  }
+}

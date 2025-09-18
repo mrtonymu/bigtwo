@@ -135,42 +135,95 @@ export function SoundEffects({
   return null
 }
 
-// 音效控制Hook
 export function useSoundEffects() {
-  const [playCardSound, setPlayCardSound] = useState(false)
-  const [winSound, setWinSound] = useState(false)
+  const [soundEnabled, setSoundEnabled] = useState(true)
   const [backgroundMusic, setBackgroundMusic] = useState(false)
-
-  const triggerCardSound = () => setPlayCardSound(true)
-  const triggerWinSound = () => setWinSound(true)
-  const toggleBackgroundMusic = () => setBackgroundMusic(prev => !prev)
-
-  // 重置音效状态
-  useEffect(() => {
-    if (playCardSound) {
-      const timer = setTimeout(() => setPlayCardSound(false), 100)
-      return () => clearTimeout(timer)
+  
+  // 增强的音效生成函数
+  const playClickSound = () => {
+    if (!soundEnabled || typeof window === 'undefined') return
+    
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const oscillator = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
+      
+      oscillator.connect(gainNode)
+      gainNode.connect(audioContext.destination)
+      
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime)
+      oscillator.frequency.exponentialRampToValueAtTime(600, audioContext.currentTime + 0.1)
+      
+      gainNode.gain.setValueAtTime(0.1, audioContext.currentTime)
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1)
+      
+      oscillator.start(audioContext.currentTime)
+      oscillator.stop(audioContext.currentTime + 0.1)
+    } catch (error) {
+      console.warn('音效播放失败:', error)
     }
-  }, [playCardSound])
+  }
 
-  useEffect(() => {
-    if (winSound) {
-      const timer = setTimeout(() => setWinSound(false), 1000)
-      return () => clearTimeout(timer)
+  const playSuccessSound = () => {
+    if (!soundEnabled || typeof window === 'undefined') return
+    
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const oscillator = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
+      
+      oscillator.connect(gainNode)
+      gainNode.connect(audioContext.destination)
+      
+      oscillator.frequency.setValueAtTime(523, audioContext.currentTime) // C5
+      oscillator.frequency.setValueAtTime(659, audioContext.currentTime + 0.1) // E5
+      oscillator.frequency.setValueAtTime(784, audioContext.currentTime + 0.2) // G5
+      
+      gainNode.gain.setValueAtTime(0.15, audioContext.currentTime)
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3)
+      
+      oscillator.start(audioContext.currentTime)
+      oscillator.stop(audioContext.currentTime + 0.3)
+    } catch (error) {
+      console.warn('音效播放失败:', error)
     }
-  }, [winSound])
+  }
+
+  const playErrorSound = () => {
+    if (!soundEnabled || typeof window === 'undefined') return
+    
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const oscillator = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
+      
+      oscillator.connect(gainNode)
+      gainNode.connect(audioContext.destination)
+      
+      oscillator.frequency.setValueAtTime(200, audioContext.currentTime)
+      oscillator.frequency.exponentialRampToValueAtTime(150, audioContext.currentTime + 0.2)
+      
+      gainNode.gain.setValueAtTime(0.1, audioContext.currentTime)
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2)
+      
+      oscillator.start(audioContext.currentTime)
+      oscillator.stop(audioContext.currentTime + 0.2)
+    } catch (error) {
+      console.warn('音效播放失败:', error)
+    }
+  }
+
+  const toggleBackgroundMusic = () => {
+    setBackgroundMusic(!backgroundMusic)
+  }
 
   return {
-    triggerCardSound,
-    triggerWinSound,
-    toggleBackgroundMusic,
+    soundEnabled,
+    setSoundEnabled,
     backgroundMusic,
-    SoundEffects: () => (
-      <SoundEffects
-        playCardSound={playCardSound}
-        winSound={winSound}
-        backgroundMusic={backgroundMusic}
-      />
-    )
+    toggleBackgroundMusic,
+    playClickSound,
+    playSuccessSound,
+    playErrorSound
   }
 }
