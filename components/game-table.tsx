@@ -55,14 +55,15 @@ function DraggableCard({ card, index, isSelected, onClick, currentTheme }: Dragg
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: card.suit + '-' + card.rank + '-' + index })
+  } = useSortable({ id: `${card.suit}-${card.rank}` })
 
-  // 拖拽库需要的动态样式，无法避免内联样式
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
   }
+
+  const isRedSuit = card.suit === "hearts" || card.suit === "diamonds"
+  const suitClass = isRedSuit ? "red-suit" : "black-suit"
 
   return (
     <button
@@ -73,18 +74,20 @@ function DraggableCard({ card, index, isSelected, onClick, currentTheme }: Dragg
       key={`${card.suit}-${card.rank}-${index}`}
       data-card-id={`${card.suit}-${card.rank}`}
       onClick={onClick}
-      className={`${currentTheme.cardStyle.background} ${currentTheme.cardStyle.border} ${currentTheme.cardStyle.text} ${currentTheme.cardStyle.shadow} border rounded-lg p-2 sm:p-3 text-xs sm:text-sm font-mono transition-all duration-300 ease-in-out hover:shadow-lg transform card-deal-animation ${
-        isSelected
-          ? `ring-2 ring-${currentTheme.tableStyle.accent.split('-')[1]}-500 -translate-y-2 sm:-translate-y-3 scale-105 shadow-xl bg-${currentTheme.tableStyle.accent.split('-')[1]}-50`
-          : "hover:-translate-y-1 sm:hover:-translate-y-2 hover:scale-105 hover:shadow-md"
-      }`}
+      className={`playing-card ${suitClass} ${
+        isSelected ? "selected" : ""
+      } modern-card-deal`}
       data-animation-delay={index * 50}
     >
       <div className="flex flex-col items-center">
-        <span className="text-lg font-bold">{card.display}</span>
+        <span className={`card-rank ${
+          isRedSuit ? "text-red-600" : "text-gray-800"
+        }`}>
+          {card.display}
+        </span>
         <span
-          className={`text-2xl ${
-            card.suit === "hearts" || card.suit === "diamonds" ? "text-red-500" : "text-black"
+          className={`card-suit ${
+            isRedSuit ? "text-red-500" : "text-gray-700"
           }`}
         >
           {card.suit === "hearts" && "♥"}
@@ -817,27 +820,36 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
             <CardContent className="p-4">
               <h3 className="font-medium mb-3 text-center">Last Play</h3>
               <div className="flex justify-center gap-2 flex-wrap">
-                {gameState.lastPlay.map((card, index) => (
-                  <div 
-                    key={`last-play-${card.suit}-${card.rank}-${index}`}
-                    className="bg-white border rounded-lg p-3 text-sm font-mono shadow-sm transform transition-all duration-500 ease-out hover:scale-105 hover:shadow-md card-play-animation"
-                    data-animation-delay={index * 100}
-                  >
-                    <div className="flex flex-col items-center">
-                      <span className="text-lg font-bold">{card.display}</span>
-                      <span
-                        className={`text-2xl ${
-                          card.suit === "hearts" || card.suit === "diamonds" ? "text-red-500" : "text-black"
-                        }`}
-                      >
-                        {card.suit === "hearts" && "♥"}
-                        {card.suit === "diamonds" && "♦"}
-                        {card.suit === "clubs" && "♣"}
-                        {card.suit === "spades" && "♠"}
-                      </span>
+                {gameState.lastPlay.map((card, index) => {
+                  const isRedSuit = card.suit === "hearts" || card.suit === "diamonds"
+                  const suitClass = isRedSuit ? "red-suit" : "black-suit"
+                  
+                  return (
+                    <div 
+                      key={`last-play-${card.suit}-${card.rank}-${index}`}
+                      className={`playing-card ${suitClass} modern-card-play`}
+                      data-animation-delay={index * 100}
+                    >
+                      <div className="flex flex-col items-center">
+                        <span className={`card-rank ${
+                          isRedSuit ? "text-red-600" : "text-gray-800"
+                        }`}>
+                          {card.display}
+                        </span>
+                        <span
+                          className={`card-suit ${
+                            isRedSuit ? "text-red-500" : "text-gray-700"
+                          }`}
+                        >
+                          {card.suit === "hearts" && "♥"}
+                          {card.suit === "diamonds" && "♦"}
+                          {card.suit === "clubs" && "♣"}
+                          {card.suit === "spades" && "♠"}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </CardContent>
           </Card>
@@ -1017,22 +1029,23 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
                                 </span>
                               </div>
                               <div className="flex gap-1 mb-2">
-                                {hint.cards.map((card, cardIndex) => (
-                                  <span 
-                                    key={cardIndex}
-                                    className={`text-xs px-1 py-0.5 rounded ${
-                                      card.suit === "hearts" || card.suit === "diamonds" 
-                                        ? "bg-red-100 text-red-700" 
-                                        : "bg-gray-100 text-gray-700"
-                                    }`}
-                                  >
-                                    {card.display}
-                                    {card.suit === "hearts" && "♥"}
-                                    {card.suit === "diamonds" && "♦"}
-                                    {card.suit === "clubs" && "♣"}
-                                    {card.suit === "spades" && "♠"}
-                                  </span>
-                                ))}
+                                {hint.cards.map((card, cardIndex) => {
+                                  const isRedSuit = card.suit === "hearts" || card.suit === "diamonds"
+                                  const suitClass = isRedSuit ? "red-suit" : "black-suit"
+                                  
+                                  return (
+                                    <span 
+                                      key={cardIndex}
+                                      className={`card-hint-chip ${suitClass}`}
+                                    >
+                                      {card.display}
+                                      {card.suit === "hearts" && "♥"}
+                                      {card.suit === "diamonds" && "♦"}
+                                      {card.suit === "clubs" && "♣"}
+                                      {card.suit === "spades" && "♠"}
+                                    </span>
+                                  )
+                                })}
                               </div>
                               <p className="text-sm text-gray-600">{hint.description}</p>
                             </div>

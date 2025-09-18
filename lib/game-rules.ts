@@ -82,10 +82,10 @@ export const PRESET_RULES: { [key: string]: GameRules } = {
       doubleOnLastCard: false
     },
     scoring: {
-      baseScore: 1,
+      baseScore: 0,
       cardCountMultiplier: 1,
-      finishBonuses: { first: 3, second: 1 },
-      penalties: { lastPlace: -3, tooManyCards: -1 }
+      finishBonuses: { first: 0, second: 0 },
+      penalties: { lastPlace: 0, tooManyCards: 0 }
     },
     timeRules: {
       enabled: false,
@@ -117,10 +117,10 @@ export const PRESET_RULES: { [key: string]: GameRules } = {
       doubleOnLastCard: true
     },
     scoring: {
-      baseScore: 2,
-      cardCountMultiplier: 2,
-      finishBonuses: { first: 5 },
-      penalties: { lastPlace: -5, tooManyCards: -2 }
+      baseScore: 0,
+      cardCountMultiplier: 1,
+      finishBonuses: { first: 0 },
+      penalties: { lastPlace: 0, tooManyCards: 0 }
     },
     timeRules: {
       enabled: true,
@@ -152,10 +152,10 @@ export const PRESET_RULES: { [key: string]: GameRules } = {
       doubleOnLastCard: false
     },
     scoring: {
-      baseScore: 1,
+      baseScore: 0,
       cardCountMultiplier: 1,
-      finishBonuses: { first: 1 },
-      penalties: { lastPlace: -1, tooManyCards: 0 }
+      finishBonuses: { first: 0 },
+      penalties: { lastPlace: 0, tooManyCards: 0 }
     },
     timeRules: {
       enabled: false,
@@ -295,6 +295,18 @@ export class GameRulesManager {
 // 计分系统
 export class GameScoring {
   static calculateScore(
+    playerCards: number, 
+    position: number, 
+    totalPlayers: number,
+    rules: GameRules
+  ): number {
+    // 简化计分系统：直接基于剩余牌数计分
+    // 类似DaiDi.io的简单计分方式
+    return playerCards
+  }
+
+  // 保留原有复杂计分方法，以备需要时使用
+  static calculateComplexScore(
     playerCards: number, 
     position: number, 
     totalPlayers: number,

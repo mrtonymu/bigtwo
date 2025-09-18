@@ -292,7 +292,7 @@
   animation: cardFlyOut 0.6s ease-in forwards;
 }
 
-/* 优化卡片布局 */
+/* 现代化卡片布局 */
 .playing-card {
   min-width: 60px;
   min-height: 84px;
@@ -305,15 +305,167 @@
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(10px);
 }
 
-/* 卡片动画延迟类 */
-.card-deal-animation {
-  animation: cardDeal 0.6s ease-out forwards;
+/* 现代化卡片悬停效果 */
+.playing-card:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  background: linear-gradient(145deg, #ffffff 0%, #f1f5f9 100%);
 }
 
-.card-play-animation {
-  animation: cardPlay 0.8s ease-out forwards;
+/* 红色花色卡片样式 */
+.playing-card.red-suit {
+  background: linear-gradient(145deg, #fef2f2 0%, #fecaca 20%, #ffffff 100%);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.playing-card.red-suit:hover {
+  background: linear-gradient(145deg, #fef2f2 0%, #fca5a5 20%, #f8fafc 100%);
+  box-shadow: 0 20px 25px -5px rgba(239, 68, 68, 0.15), 0 10px 10px -5px rgba(239, 68, 68, 0.08);
+}
+
+/* 黑色花色卡片样式 */
+.playing-card.black-suit {
+  background: linear-gradient(145deg, #f8fafc 0%, #e2e8f0 20%, #ffffff 100%);
+  border: 1px solid rgba(71, 85, 105, 0.2);
+}
+
+.playing-card.black-suit:hover {
+  background: linear-gradient(145deg, #f1f5f9 0%, #cbd5e1 20%, #f8fafc 100%);
+  box-shadow: 0 20px 25px -5px rgba(71, 85, 105, 0.15), 0 10px 10px -5px rgba(71, 85, 105, 0.08);
+}
+
+/* 选中状态的现代化样式 */
+.playing-card.selected {
+  transform: translateY(-8px) scale(1.05);
+  box-shadow: 0 25px 50px -12px rgba(59, 130, 246, 0.25), 0 0 0 3px rgba(59, 130, 246, 0.3);
+  background: linear-gradient(145deg, #dbeafe 0%, #bfdbfe 50%, #ffffff 100%);
+  border: 1px solid rgba(59, 130, 246, 0.5);
+}
+
+/* 卡片内容样式优化 */
+.playing-card .card-rank {
+  font-weight: 700;
+  font-size: 1.125rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.playing-card .card-suit {
+  font-size: 1.5rem;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+}
+
+/* 增强的卡片动画效果 */
+@keyframes modernCardDeal {
+  0% {
+    opacity: 0;
+    transform: translateY(50px) scale(0.8) rotateY(-90deg);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translateY(-10px) scale(1.05) rotateY(-45deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotateY(0deg);
+  }
+}
+
+@keyframes modernCardPlay {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotateZ(0deg);
+  }
+  25% {
+    opacity: 0.9;
+    transform: translateY(-15px) scale(1.1) rotateZ(5deg);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translateY(-30px) scale(1.15) rotateZ(-3deg);
+  }
+  75% {
+    opacity: 0.6;
+    transform: translateY(-45px) scale(1.1) rotateZ(2deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-100px) scale(0.8) rotateZ(0deg);
+  }
+}
+
+@keyframes modernCardHover {
+  0% {
+    transform: translateY(0) scale(1) rotateZ(0deg);
+  }
+  100% {
+    transform: translateY(-6px) scale(1.03) rotateZ(1deg);
+  }
+}
+
+@keyframes modernCardSelect {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-12px) scale(1.08);
+  }
+  100% {
+    transform: translateY(-8px) scale(1.05);
+  }
+}
+
+/* 现代化动画类 */
+.modern-card-deal {
+  animation: modernCardDeal 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.modern-card-play {
+  animation: modernCardPlay 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.modern-card-hover {
+  animation: modernCardHover 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.modern-card-select {
+  animation: modernCardSelect 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* 卡片提示样式现代化 */
+.card-hint-chip {
+  background: linear-gradient(145deg, #f8fafc 0%, #e2e8f0 100%);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.card-hint-chip.red-suit {
+  background: linear-gradient(145deg, #fef2f2 0%, #fecaca 100%);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #dc2626;
+}
+
+.card-hint-chip.black-suit {
+  background: linear-gradient(145deg, #f8fafc 0%, #e2e8f0 100%);
+  border: 1px solid rgba(71, 85, 105, 0.3);
+  color: #475569;
+}
+
+.card-hint-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
 /* 动态动画延迟 - 通过JavaScript设置 */
