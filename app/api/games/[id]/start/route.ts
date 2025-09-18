@@ -75,8 +75,10 @@ export async function POST(
       game_id: gameId,
       current_player: 0,
       last_play: [],
+      last_player: null,
       deck: remainingCards,
-      turn_count: 0
+      turn_count: 0,
+      play_history: []
     })
 
     if (gameStateResult.error) {
