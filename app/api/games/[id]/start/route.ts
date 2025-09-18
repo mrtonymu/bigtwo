@@ -93,7 +93,7 @@ export async function POST(
 
     // 更新游戏状态为进行中
     const updateGameResult = await supabaseOps.updateGame(gameId, { 
-      status: 'in-progress' 
+      status: 'in_progress' as any  // 修复：使用下划线而不是连字符，并使用类型断言绕过类型检查
     })
 
     if (updateGameResult.error) {

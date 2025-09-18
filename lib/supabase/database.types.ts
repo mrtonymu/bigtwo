@@ -44,7 +44,7 @@ export type SupabaseQueryBuilder<T> = ReturnType<ReturnType<typeof import('@supa
 // 游戏状态枚举
 export const GameStatus = {
   WAITING: 'waiting',
-  IN_PROGRESS: 'in-progress', 
+  IN_PROGRESS: 'in_progress',  // 修复：使用下划线而不是连字符
   FINISHED: 'finished'
 } as const
 

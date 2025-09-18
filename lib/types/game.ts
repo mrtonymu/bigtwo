@@ -101,7 +101,7 @@ export interface ExtendedGameRoom {
   players: Player[]
   maxPlayers: number
   spectators: number
-  status: "waiting" | "in-progress" | "finished"
+  status: "waiting" | "in_progress" | "finished"
   created_at: string
   gameState?: GameState
 }
@@ -155,6 +155,6 @@ export interface WerewolfRoom {
   name: string
   players: WerewolfPlayer[]
   maxPlayers: number
-  status: "waiting" | "in-progress" | "finished"
+  status: "waiting" | "in_progress" | "finished"  // 修复：使用下划线而不是连字符
   created_at: string
 }

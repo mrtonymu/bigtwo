@@ -75,13 +75,14 @@ export default function GamePage() {
       ) || false
       setIsHost(isCurrentPlayerHost)
 
-      // Check if game is already in progress
-      if ((gameData as any).status === "in-progress") {
-        setGameStatus("ready")
-      } else {
-        // Always show waiting status, let users choose when to start
-        setGameStatus("waiting")
+      // 检查游戏是否正在进行中
+      if ((gameData as any).status === "in_progress") {
+        router.push(`/game/${gameId}`);
+        return;
       }
+
+      // Always show waiting status, let users choose when to start
+      setGameStatus("waiting")
     } catch (error) {
       console.error("Error checking game status:", error)
       setGameStatus("not-found")

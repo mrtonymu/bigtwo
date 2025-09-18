@@ -9,7 +9,7 @@ export interface Database {
         Row: {
           id: string
           name: string
-          status: 'waiting' | 'in-progress' | 'finished'
+          status: 'waiting' | 'in_progress' | 'finished'
           max_players: number
           current_players: number
           spectators: number
@@ -27,7 +27,7 @@ export interface Database {
         Insert: {
           id?: string
           name: string
-          status?: 'waiting' | 'in-progress' | 'finished'
+          status?: 'waiting' | 'in_progress' | 'finished'
           max_players?: number
           current_players?: number
           spectators?: number
@@ -45,7 +45,7 @@ export interface Database {
         Update: {
           id?: string
           name?: string
-          status?: 'waiting' | 'in-progress' | 'finished'
+          status?: 'waiting' | 'in_progress' | 'finished'
           max_players?: number
           current_players?: number
           spectators?: number

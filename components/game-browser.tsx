@@ -16,7 +16,7 @@ interface GameRoom {
   players: number
   maxPlayers: number
   spectators: number
-  status: "waiting" | "in-progress" | "finished"
+  status: "waiting" | "in_progress" | "finished"  // 修复：使用下划线而不是连字符
   created_at: string
 }
 
@@ -56,7 +56,7 @@ export function GameBrowser({ playerName }: GameBrowserProps) {
         players: game.current_players || 0,
         maxPlayers: game.max_players || 4,
         spectators: game.spectators || 0,
-        status: game.status as "waiting" | "in-progress" | "finished",
+        status: game.status as "waiting" | "in_progress" | "finished",  // 修复：使用下划线而不是连字符
         created_at: game.created_at,
       }))
 
@@ -134,7 +134,7 @@ export function GameBrowser({ playerName }: GameBrowserProps) {
     switch (status) {
       case "waiting":
         return "bg-yellow-500"
-      case "in-progress":
+      case "in_progress":  // 修复：使用下划线而不是连字符
         return "bg-green-500"
       case "finished":
         return "bg-gray-500"
@@ -147,7 +147,7 @@ export function GameBrowser({ playerName }: GameBrowserProps) {
     switch (status) {
       case "waiting":
         return "等待中"
-      case "in-progress":
+      case "in_progress":  // 修复：使用下划线而不是连字符
         return "游戏中"
       case "finished":
         return "已结束"

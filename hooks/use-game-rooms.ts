@@ -18,7 +18,7 @@ interface GameRoom {
   host?: string
   currentPlayers: number
   maxPlayers: number
-  status: 'waiting' | 'in-progress' | 'finished'
+  status: 'waiting' | 'in_progress' | 'finished'  // 修复：使用下划线而不是连字符
   isPrivate?: boolean
   rules?: GameRules
   created_at: string

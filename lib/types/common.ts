@@ -33,7 +33,7 @@ export interface GameRoom {
   players: number
   maxPlayers: number
   spectators: number
-  status: "waiting" | "in-progress" | "finished"
+  status: "waiting" | "in_progress" | "finished"
   created_at: string
 }
 

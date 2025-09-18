@@ -788,7 +788,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       await supabase
         .from("games")
         // @ts-ignore
-        .update({ status: "in-progress" })
+        .update({ status: "in_progress" })  // 修复：使用下划线而不是连字符
         .eq("id", gameId)
 
       toast.dismiss(loadingToast)
