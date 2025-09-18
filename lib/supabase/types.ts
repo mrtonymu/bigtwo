@@ -100,6 +100,7 @@ export interface Database {
           turn_count: number
           play_history: PlayHistory[]
           deck: Card[]
+          game_rules: any // 添加缺失的字段
           created_at: string
           updated_at: string
         }
@@ -112,6 +113,7 @@ export interface Database {
           turn_count?: number
           play_history?: PlayHistory[]
           deck?: Card[]
+          game_rules?: any // 添加缺失的字段
           created_at?: string
           updated_at?: string
         }
@@ -124,6 +126,7 @@ export interface Database {
           turn_count?: number
           play_history?: PlayHistory[]
           deck?: Card[]
+          game_rules?: any // 添加缺失的字段
           created_at?: string
           updated_at?: string
         }

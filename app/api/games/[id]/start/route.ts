@@ -78,7 +78,8 @@ export async function POST(
       last_player: null,
       deck: remainingCards,
       turn_count: 0,
-      play_history: []
+      play_history: [],
+      game_rules: {} // 添加缺失的字段
     })
 
     if (gameStateResult.error) {
