@@ -70,13 +70,13 @@ export default function GamePage() {
       setPlayers(playersData || [])
 
       // Check if current player is the host (first player or creator)
-      const isCurrentPlayerHost = playersData?.some(player => 
+      const isCurrentPlayerHost = playersData?.some((player: any) => 
         player.player_name === playerName && player.position === 0
       ) || false
       setIsHost(isCurrentPlayerHost)
 
       // Check if game is already in progress
-      if (gameData.status === "in-progress") {
+      if ((gameData as any).status === "in-progress") {
         setGameStatus("ready")
       } else {
         // Always show waiting status, let users choose when to start
@@ -92,51 +92,19 @@ export default function GamePage() {
     const loadingToast = toast.loading("正在开始游戏...")
     
     try {
-      // Create deck and deal cards
-      const originalDeck = createDeck()
-      const hands = dealCards([...originalDeck], playerCount) // Use copy to avoid modifying original
-
-      // Get all players
-      const { data: playersData } = await supabase
-        .from("players")
-        .select("*")
-        .eq("game_id", gameId)
-        .eq("is_spectator", false)
-        .order("position")
-
-      if (!playersData) return
-
-      // Update each player with their cards
-      for (let i = 0; i < playersData.length; i++) {
-        await supabase.from("players").update({ cards: hands[i] }).eq("id", playersData[i].id)
-      }
-
-      // Create initial game state
-      // For 4 players, all 52 cards are dealt, so no remaining cards
-      const remainingCards = playerCount === 4 ? [] : originalDeck.slice(playerCount * 13)
-      console.log(`Creating game state for ${playerCount} players, remaining cards: ${remainingCards.length}`)
-      
-      const { error: gameStateError } = await supabase.from("game_state").insert({
-        game_id: gameId,
-        current_player: 0,
-        last_play: [],
-        deck: remainingCards, // remaining cards
-        turn_count: 0,
+      const response = await fetch(`/api/games/${gameId}/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       })
 
-      if (gameStateError) {
-        console.error("Error creating game state:", gameStateError)
-        throw gameStateError
+      const result = await response.json()
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || '开始游戏失败')
       }
 
-      // Update game status
-      const { error: updateGameError } = await supabase.from("games").update({ status: "in-progress" }).eq("id", gameId)
-      
-      if (updateGameError) {
-        console.error("Error updating game status:", updateGameError)
-        throw updateGameError
-      }
-      
       toast.dismiss(loadingToast)
       toast.success("游戏开始！正在自动发牌...")
       setGameStatus("ready")
@@ -148,7 +116,7 @@ export default function GamePage() {
     } catch (error) {
       console.error("Error starting game:", error)
       toast.dismiss(loadingToast)
-      toast.error("开始游戏失败，请重试")
+      toast.error(error instanceof Error ? error.message : "开始游戏失败，请重试")
     }
   }
 
@@ -159,7 +127,7 @@ export default function GamePage() {
       // Update game status to finished
       const { error: updateGameError } = await supabase
         .from("games")
-        .update({ status: "finished" })
+        .update({ status: "finished" } as any)
         .eq("id", gameId)
       
       if (updateGameError) {
@@ -260,7 +228,7 @@ export default function GamePage() {
                     onClick={endGame} 
                     variant="destructive" 
                     className="w-full"
-                    disabled={gameStatus === "loading"}
+                    disabled={gameStatus === "loading" || gameStatus === "not-found"}
                   >
                     🏁 结束游戏
                   </Button>
