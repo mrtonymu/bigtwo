@@ -369,6 +369,10 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
         // @ts-ignore
         await supabase.from("games").update({ status: "finished" }).eq("id", gameId)
       }
+      // 如果没有获胜者但游戏已结束，重置游戏获胜者状态
+      else if (!winner && gameWinner && newState.gameState?.turnCount === 0) {
+        setGameWinner(null)
+      }
 
       // 找到当前玩家的位置和手牌
       // 添加检查确保playerName不为空
@@ -426,7 +430,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
         handleGameError(error, "获取游戏数据失败")
       setIsLoading(false)
     }
-  }, [gameId, playerName, gameOptions.autoArrange, gameOptions.cardSorting, gameWinner, isManualSort])
+  }, [gameId, playerName, gameOptions.autoArrange, gameOptions.cardSorting, gameWinner, isManualSort, supabase])
 
   useEffect(() => {
     // Subscribe to game updates - 使用安全的订阅管理
@@ -447,6 +451,13 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
           // 实时同步游戏选项变更
           if (payload.new && (payload.new as any).game_options) {
             setGameOptions((payload.new as any).game_options)
+          }
+          // 检查游戏状态变更
+          if (payload.new && (payload.new as any).status) {
+            // 如果游戏状态变为finished，立即获取最新数据
+            if ((payload.new as any).status === "finished") {
+              setTimeout(() => fetchGameData(), 100)
+            }
           }
         }
       )
@@ -626,6 +637,11 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
         stopTurnTimer()
         playSuccessSound()
         showSuccess("自动出牌成功！")
+        
+        // 立即刷新游戏数据以确保UI更新
+        setTimeout(() => {
+          fetchGameData()
+        }, 100)
       }, 1000) // 1秒延迟让用户看到选择的牌
       
     } catch (error) {
@@ -715,6 +731,11 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       stopTurnTimer() // 停止计时器
       playSuccessSound() // 播放成功音效
       showSuccess("出牌成功！")
+      
+      // 立即刷新游戏数据以确保UI更新
+      setTimeout(() => {
+        fetchGameData()
+      }, 100)
     } catch (error) {
       console.error("Error playing cards:", error)
       toast.error("出牌失败，请重试")
@@ -745,6 +766,11 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
 
       stopTurnTimer() // 停止计时器
       toast.success("已跳过回合")
+      
+      // 立即刷新游戏数据以确保UI更新
+      setTimeout(() => {
+        fetchGameData()
+      }, 100)
     } catch (error) {
       console.error("Error passing turn:", error)
       toast.error("跳过回合失败，请重试")
@@ -801,7 +827,9 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       toast.success("新游戏开始！")
       
       // 刷新游戏数据
-      fetchGameData()
+      setTimeout(() => {
+        fetchGameData()
+      }, 500)
     } catch (error) {
       console.error("Error starting new game:", error)
       toast.dismiss(loadingToast)
@@ -830,7 +858,9 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       toast.success("游戏已结束")
       
       // Refresh game data
-      await fetchGameData()
+      setTimeout(() => {
+        fetchGameData()
+      }, 500)
     } catch (error) {
       console.error("Error ending game:", error)
       toast.dismiss(loadingToast)
@@ -841,6 +871,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
   // Show game start message if game just started (only show briefly)
   useEffect(() => {
     // 只有在游戏真正刚开始时（turnCount为0且之前没有显示过）才显示游戏开始消息
+    // 添加额外的检查：确保游戏状态存在且手牌已分发
     if (gameState && gameState.turnCount === 0 && myCards.length > 0 && !showGameStart) {
       setShowGameStart(true)
       // Auto hide after 3 seconds
@@ -849,7 +880,23 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       }, 3000)
       return () => clearTimeout(timer)
     }
-  }, [gameState?.turnCount, myCards.length, showGameStart])
+    // 当游戏开始后（turnCount > 0），确保隐藏游戏开始界面
+    else if (gameState && gameState.turnCount > 0 && showGameStart) {
+      setShowGameStart(false)
+    }
+    // 添加额外的条件：如果游戏状态存在但手牌为空，也隐藏开始界面
+    else if (gameState && myCards.length === 0 && showGameStart) {
+      setShowGameStart(false)
+    }
+    // 添加额外的条件：如果玩家位置已确定且手牌已分发，隐藏开始界面
+    else if (myPosition !== -1 && myCards.length > 0 && showGameStart) {
+      setShowGameStart(false)
+    }
+    // 添加额外的条件：如果玩家位置为-1（未找到玩家），也隐藏开始界面
+    else if (myPosition === -1 && showGameStart) {
+      setShowGameStart(false)
+    }
+  }, [gameState?.turnCount, myCards.length, showGameStart, myPosition])
 
   // Debug logging
   console.log('GameTable Debug:', {
@@ -860,8 +907,10 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
     } : null,
     myPosition,
     playerName,
-    isMyTurn,
-    playersCount: players.length
+    isMyTurn: isMyTurn ?? null,
+    playersCount: players.length,
+    myCardsCount: myCards.length,
+    showGameStart
   })
 
   if (isLoading) {
@@ -911,14 +960,25 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
     )
   }
 
+  // 为GameLayout组件准备gameState数据，添加status属性
+  const gameLayoutState = gameState ? {
+    ...gameState,
+    status: gameState.turnCount > 0 ? ("playing" as const) : ("waiting" as const)
+  } : null;
+  
+  // 如果游戏状态存在且轮次大于0，确保状态为playing
+  if (gameLayoutState && gameState && gameState.turnCount > 0) {
+    gameLayoutState.status = "playing" as const;
+  }
+
   return (
     <GameLayout
-      gameState={gameState}
+      gameState={gameLayoutState}
       players={players}
       myPosition={myPosition}
       myCards={myCards}
       selectedCards={selectedCards}
-      isMyTurn={isMyTurn}
+      isMyTurn={!!isMyTurn}
       isHost={isHost}
       timeRemaining={timeRemaining}
       isConnected={isConnected}
@@ -943,6 +1003,11 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
         const sorted = type === 'auto' ? autoArrangeCards(myCards) : sortCards(myCards, type)
         setMyCards(sorted)
         setIsManualSort(true)
+        // 修复：点击排序按钮后不保存到数据库，避免触发不必要的更新
+        // 只在游戏未进行时才保存到数据库
+        if (gameState?.turnCount === 0) {
+          saveCardsSmartly(sorted)
+        }
       }}
       onStartNewGame={startNewGame}
       onEndGame={endGame}

@@ -85,7 +85,13 @@ export default function GamePage() {
       // 检查游戏是否正在进行中
       if ((gameData as any).status === "in_progress") {
         setGameStatus("ready")
-        return;
+        return
+      }
+      
+      // 检查游戏是否已结束
+      if ((gameData as any).status === "finished") {
+        setGameStatus("waiting")
+        return
       }
 
       // Always show waiting status, let users choose when to start
