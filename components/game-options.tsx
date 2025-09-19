@@ -69,7 +69,7 @@ export function GameOptions({ isOpen, onClose, onSave, gameId }: GameOptionsProp
   useEffect(() => {
     const savedOptions = loadGameOptions()
     setOptions(savedOptions)
-  }, [])
+  }, []) // 只在组件挂载时执行一次
 
   if (!isOpen) return null
 

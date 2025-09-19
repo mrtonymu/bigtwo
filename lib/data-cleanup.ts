@@ -36,14 +36,27 @@ export async function cleanupExpiredGames() {
     }
 
     // 清理孤立的玩家记录
-    const { error: orphanPlayersError } = await supabase
-      .from('players')
-      .delete()
-      .not('game_id', 'in', 
-        supabase
-          .from('games')
-          .select('id')
-      )
+    // 首先获取所有存在的游戏ID
+    const { data: existingGames, error: gamesError } = await supabase
+      .from('games')
+      .select('id')
+    
+    if (gamesError) {
+      console.error('获取游戏列表失败:', gamesError)
+      return false
+    }
+    
+    const existingGameIds = (existingGames as { id: string }[])?.map(game => game.id) || []
+    
+    // 删除不在现有游戏列表中的玩家记录
+    const { error: orphanPlayersError } = existingGameIds.length > 0 
+      ? await supabase
+          .from('players')
+          .delete()
+          .not('game_id', 'in', `(${existingGameIds.map(id => `'${id}'`).join(',')})`)
+      : await supabase
+          .from('players')
+          .delete() // 如果没有游戏，删除所有玩家记录
     
     if (orphanPlayersError) {
       console.error('清理孤立玩家记录失败:', orphanPlayersError)
@@ -51,14 +64,15 @@ export async function cleanupExpiredGames() {
     }
 
     // 清理孤立的游戏状态记录
-    const { error: orphanGameStateError } = await supabase
-      .from('game_state')
-      .delete()
-      .not('game_id', 'in',
-        supabase
-          .from('games')
-          .select('id')
-      )
+    // 使用相同的方法处理游戏状态记录
+    const { error: orphanGameStateError } = existingGameIds.length > 0 
+      ? await supabase
+          .from('game_state')
+          .delete()
+          .not('game_id', 'in', `(${existingGameIds.map(id => `'${id}'`).join(',')})`)
+      : await supabase
+          .from('game_state')
+          .delete() // 如果没有游戏，删除所有游戏状态记录
     
     if (orphanGameStateError) {
       console.error('清理孤立游戏状态失败:', orphanGameStateError)

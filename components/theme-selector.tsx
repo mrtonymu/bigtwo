@@ -220,7 +220,7 @@ export function useTheme() {
         setCurrentTheme(theme)
       }
     }
-  }, [])
+  }, []) // 只在组件挂载时执行一次，避免不必要的更新
 
   const changeTheme = (theme: Theme) => {
     setCurrentTheme(theme)

@@ -22,6 +22,7 @@ import { CNFLIXLogo } from "@/components/cnflix-logo"
 import { useSoundEffects, SoundEffects } from "@/components/sound-effects"
 import { GameStats } from "@/components/game-stats"
 import { ThemeSelector, useTheme } from "@/components/theme-selector"
+import { GameLayout } from "@/components/game-layout"
 import {
   DndContext,
   closestCenter,
@@ -350,6 +351,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
           lastPlay: (gameStateData as any).last_play || [],
           lastPlayer: (gameStateData as any).last_player,
           turnCount: (gameStateData as any).turn_count,
+          playHistory: (gameStateData as any).play_history || [],
         } : null
       }
 
@@ -424,7 +426,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
         handleGameError(error, "获取游戏数据失败")
       setIsLoading(false)
     }
-  }, [gameId, playerName, gameOptions.autoArrange, gameOptions.cardSorting, gameWinner])
+  }, [gameId, playerName, gameOptions.autoArrange, gameOptions.cardSorting, gameWinner, isManualSort])
 
   useEffect(() => {
     // Subscribe to game updates - 使用安全的订阅管理
@@ -606,7 +608,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
           // @ts-ignore
           .update({
             current_player: nextPlayer,
-            last_play: suggestedCards,
+            last_play: suggestedCards,  // 确保正确更新last_play
             last_player: myPosition,
             turn_count: gameState.turnCount + 1,
             play_history: newPlayHistory,
@@ -695,7 +697,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
         // @ts-ignore
         .update({
           current_player: nextPlayer,
-          last_play: selectedCards,
+          last_play: selectedCards,  // 确保正确更新last_play
           last_player: myPosition,
           turn_count: gameState.turnCount + 1,
           play_history: newPlayHistory,
@@ -838,7 +840,8 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
 
   // Show game start message if game just started (only show briefly)
   useEffect(() => {
-    if (gameState && gameState.turnCount === 0 && myCards.length > 0) {
+    // 只有在游戏真正刚开始时（turnCount为0且之前没有显示过）才显示游戏开始消息
+    if (gameState && gameState.turnCount === 0 && myCards.length > 0 && !showGameStart) {
       setShowGameStart(true)
       // Auto hide after 3 seconds
       const timer = setTimeout(() => {
@@ -846,7 +849,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       }, 3000)
       return () => clearTimeout(timer)
     }
-  }, [gameState, myCards])
+  }, [gameState?.turnCount, myCards.length, showGameStart])
 
   // Debug logging
   console.log('GameTable Debug:', {
@@ -909,469 +912,52 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-2 sm:px-4 py-2 sm:py-4">
-          <div className="flex items-center justify-between">
-            {/* 左侧：返回按钮和Logo */}
-            <div className="flex items-center gap-2 sm:gap-4">
-              <Button variant="ghost" asChild size="sm" className="enhanced-button-feedback">
-                <Link href="/" className="text-xs sm:text-sm">
-                  <span className="hidden sm:inline">← 返回大厅</span>
-                  <span className="sm:hidden">←</span>
-                </Link>
-              </Button>
-              <div className="hidden sm:block">
-                <CNFLIXLogo size="md" />
-              </div>
-              <div className="sm:hidden">
-                <CNFLIXLogo size="sm" />
-              </div>
-            </div>
-
-            {/* 中间：时间倒计时（移动端优先显示） */}
-            {timeRemaining > 0 && (
-              <div className="flex items-center gap-2 px-2 sm:px-3 py-1 bg-red-100 rounded-full">
-                <span className="text-xs sm:text-sm font-medium text-red-700">
-                  ⏰ {timeRemaining}s
-                </span>
-              </div>
-            )}
-
-            {/* 右侧：功能按钮 */}
-            <div className="flex items-center gap-1 sm:gap-2">
-              {/* 移动端：合并按钮组 */}
-              <div className="flex items-center gap-1 sm:hidden">
-                <Button onClick={toggleBackgroundMusic} variant="outline" size="sm" className="enhanced-button-feedback p-2">
-                  {backgroundMusic ? "🔇" : "🎵"}
-                </Button>
-                <Button onClick={() => setShowStats(true)} variant="outline" size="sm" className="enhanced-button-feedback p-2">
-                  📊
-                </Button>
-                <Button onClick={() => setShowThemeSelector(true)} variant="outline" size="sm" className="enhanced-button-feedback p-2">
-                  🎨
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setShowOptions(true)} className="enhanced-button-feedback p-2">
-                  ⚙️
-                </Button>
-              </div>
-
-              {/* 桌面端：完整按钮 */}
-              <div className="hidden sm:flex items-center gap-2">
-                <Button onClick={toggleBackgroundMusic} variant="outline" size="sm" className="enhanced-button-feedback">
-                  {backgroundMusic ? "🔇" : "🎵"}
-                </Button>
-                <Button onClick={() => setShowStats(true)} variant="outline" size="sm" className="enhanced-button-feedback">
-                  📊 统计
-                </Button>
-                <Button onClick={() => setShowThemeSelector(true)} variant="outline" size="sm" className="enhanced-button-feedback">
-                  🎨 主题
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setShowOptions(true)} className="enhanced-button-feedback">
-                  <span className="mr-2">⚙️</span>
-                  观影设置
-                </Button>
-              </div>
-
-              {/* 连接状态指示器 */}
-              <div className="flex items-center gap-1 sm:gap-2">
-                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-                <span className="hidden sm:inline text-sm text-gray-600">
-                  {isConnected ? '已连接' : '连接断开'}
-                </span>
-                {isReconnecting && (
-                  <span className="text-xs sm:text-sm text-blue-600">重连中...</span>
-                )}
-                {!isConnected && !isReconnecting && (
-                  <Button size="sm" variant="outline" onClick={manualReconnect} className="enhanced-button-feedback text-xs sm:text-sm">
-                    重连
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <div className="max-w-6xl mx-auto p-4">
-        <Card className={`mb-6 ${currentTheme.tableStyle.background === 'bg-gray-900' ? 'bg-gray-800' : 'bg-white'}`}>
-          <CardHeader className="pb-3">
-            <div className="flex justify-between items-center">
-              <CardTitle className="text-lg">Game Status</CardTitle>
-              <div className="flex gap-4 text-sm text-gray-600">
-                <span className="transition-all duration-300">Turn: {gameState?.turnCount || 0}</span>
-                <span className="transition-all duration-300 font-medium">
-                  Current: {players[gameState?.currentPlayer || 0]?.name || "Unknown"}
-                </span>
-              </div>
-            </div>
-          </CardHeader>
-        </Card>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
-          {players
-            .filter((p) => p.position !== myPosition)
-            .map((player, index) => (
-              <Card 
-                key={player.id}
-                className={`transition-all duration-500 ease-out hover:shadow-lg status-change-animation ${
-                  gameState?.currentPlayer === player.position 
-                    ? 'ring-2 ring-blue-500 shadow-lg transform scale-105' 
-                    : 'hover:transform hover:scale-102'
-                } ${currentTheme.tableStyle.background === 'bg-gray-900' ? 'bg-gray-800' : 'bg-white'}`}
-                style={{ animationDelay: `${index * 200}ms` }}
-              >
-                <CardContent className="p-2 sm:p-3 lg:p-4 text-center">
-                  <h3 className="font-medium mb-1 sm:mb-2 transition-all duration-300 text-xs sm:text-sm lg:text-base truncate">{player.name}</h3>
-                  <div className="flex flex-col sm:flex-row justify-center items-center gap-1 sm:gap-2">
-                    {gameOptions.showCardCount && (
-                      <Badge 
-                        variant="secondary" 
-                        className="transition-all duration-300 hover:scale-105 text-xs"
-                      >
-                        {player.cards.length} 张
-                      </Badge>
-                    )}
-                    {gameState?.currentPlayer === player.position && (
-                      <Badge className="bg-blue-500 animate-pulse text-xs">
-                        当前回合
-                      </Badge>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-        </div>
-
-        {gameState?.lastPlay && gameState.lastPlay.length > 0 && (
-          <Card className="mb-6">
-            <CardContent className="p-4">
-              <h3 className="font-medium mb-3 text-center">Last Play</h3>
-              <div className="flex justify-center gap-2 flex-wrap">
-                {gameState.lastPlay.map((card, index) => {
-                  const isRedSuit = card.suit === "hearts" || card.suit === "diamonds"
-                  const suitClass = isRedSuit ? "red-suit" : "black-suit"
-                  
-                  return (
-                    <div 
-                      key={`last-play-${card.suit}-${card.rank}-${index}`}
-                      className={`playing-card ${suitClass} modern-card-play ${currentTheme.cardStyle.background} ${currentTheme.cardStyle.border} ${currentTheme.cardStyle.text} ${currentTheme.cardStyle.shadow}`}
-                      data-animation-delay={index * 100}
-                    >
-                      <div className="flex flex-col items-center">
-                        <span className={`card-rank ${
-                          isRedSuit ? "text-red-600" : "text-gray-800"
-                        }`}>
-                          {card.display}
-                        </span>
-                        <span
-                          className={`card-suit ${
-                            isRedSuit ? "text-red-500" : "text-gray-700"
-                          }`}
-                        >
-                          {card.suit === "hearts" && "♥"}
-                          {card.suit === "diamonds" && "♦"}
-                          {card.suit === "clubs" && "♣"}
-                          {card.suit === "spades" && "♠"}
-                        </span>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* 游戏历史记录 */}
-        {gameState?.playHistory && gameState.playHistory.length > 0 && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-center">游戏历史</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="max-h-64 overflow-y-auto space-y-2">
-                {gameState?.playHistory?.slice(-10).reverse().map((play, index) => (
-                  <div 
-                    key={`history-${play.turn}-${index}`}
-                    className={`flex items-center justify-between p-2 ${currentTheme.tableStyle.background === 'bg-gray-900' ? 'bg-gray-800' : 'bg-gray-50'} rounded-lg text-sm`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-blue-600">第{play.turn}轮</span>
-                      <span className="text-gray-600">{play.playerName}</span>
-                      <Badge variant="outline" className="text-xs">
-                        {play.playType}
-                      </Badge>
-                    </div>
-                    <div className="flex gap-1">
-                      {play.cards.map((card, cardIndex) => (
-                        <span 
-                          key={`history-card-${cardIndex}`}
-                          className={`text-xs px-1 py-0.5 rounded ${
-                            card.suit === "hearts" || card.suit === "diamonds" 
-                              ? "bg-red-100 text-red-700" 
-                              : "bg-gray-100 text-gray-700"
-                          }`}
-                        >
-                          {card.display}
-                          {card.suit === "hearts" && "♥"}
-                          {card.suit === "diamonds" && "♦"}
-                          {card.suit === "clubs" && "♣"}
-                          {card.suit === "spades" && "♠"}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-center flex-1">Your Cards ({myCards.length})</CardTitle>
-              <div className="flex gap-1 flex-wrap">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const sorted = sortCards(myCards, "suit")
-                    setMyCards(sorted)
-                    setIsManualSort(true) // 标记为手动排序
-                    saveCardsSmartly(sorted) // 使用智能同步
-                  }}
-                  className="text-xs enhanced-button-feedback"
-                >
-                  ♠️ 花色
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const sorted = sortCards(myCards, "rank")
-                    setMyCards(sorted)
-                    setIsManualSort(true) // 标记为手动排序
-                    saveCardsSmartly(sorted) // 使用智能同步
-                  }}
-                  className="text-xs enhanced-button-feedback"
-                >
-                  🔢 点数
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const arranged = autoArrangeCards(myCards)
-                    setMyCards(arranged)
-                    setIsManualSort(true) // 标记为手动排序
-                    saveCardsSmartly(arranged) // 使用智能同步
-                  }}
-                  className="text-xs enhanced-button-feedback"
-                >
-                  🎯 整理
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext
-                items={myCards.map((card, index) => card.suit + '-' + card.rank + '-' + index)}
-                strategy={verticalListSortingStrategy}
-              >
-                <div className={`flex flex-wrap justify-center gap-1 sm:gap-2 mb-4 sm:mb-6 px-1 sm:px-0 ${currentTheme.tableStyle.background === 'bg-gray-900' ? 'bg-gray-800' : 'bg-gray-50'} p-2 rounded-lg`}>
-                  {myCards.map((card, index) => {
-                    // 移动端动态卡牌大小计算
-                    const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
-                    const cardWidth = isMobile 
-                      ? Math.max(40, Math.min(60, (window.innerWidth - 32) / Math.max(13, myCards.length)))
-                      : 60
-                    
-                    return (
-                      <div 
-                        key={`${card.suit}-${card.rank}`}
-                        className="touch-manipulation gpu-accelerated"
-                        style={{ 
-                          minWidth: '40px',
-                          maxWidth: '60px',
-                          width: `${cardWidth}px`
-                        }}
-                      >
-                        <DraggableCard
-                          card={card}
-                          index={index}
-                          isSelected={selectedCards.some(c => c.suit === card.suit && c.rank === card.rank)}
-                          onClick={() => handleCardClick(card)}
-                          currentTheme={currentTheme}
-                          clickAnimation={clickAnimation}
-                        />
-                      </div>
-                    )
-                  })}
-                </div>
-              </SortableContext>
-            </DndContext>
-
-            {isMyTurn ? (
-              <div className="flex flex-col items-center gap-3">
-                {/* 移动端：垂直布局的操作按钮 */}
-                <div className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-3 w-full max-w-md sm:max-w-none">
-                  <Button 
-                    onClick={handlePlay} 
-                    disabled={selectedCards.length === 0} 
-                    className={`px-4 sm:px-6 py-3 sm:py-3 transition-all duration-300 text-sm sm:text-base enhanced-button-feedback ${
-                      selectedCards.length > 0 
-                        ? 'play-button bg-green-600 hover:bg-green-700 shadow-lg hover:shadow-xl transform hover:scale-105' 
-                        : 'bg-gray-400'
-                    } touch-manipulation min-h-[48px] sm:min-h-auto`}
-                  >
-                    <span className="flex items-center justify-center gap-2">
-                      <span>出牌</span>
-                      <span className="bg-white/20 px-2 py-1 rounded-full text-xs">
-                        {selectedCards.length}
-                      </span>
-                    </span>
-                  </Button>
-                  
-                  <div className="flex gap-2 w-full sm:w-auto">
-                    <Button 
-                      onClick={handlePass} 
-                      variant="outline" 
-                      className="px-4 sm:px-6 py-3 sm:py-3 bg-transparent hover:bg-gray-100 transition-all duration-300 text-sm sm:text-base flex-1 sm:flex-none enhanced-button-feedback hover:shadow-lg transform hover:scale-105 touch-manipulation min-h-[48px] sm:min-h-auto"
-                    >
-                      Pass
-                    </Button>
-                    <Button 
-                      onClick={() => setShowHints(!showHints)} 
-                      variant="outline"
-                      className="px-4 sm:px-6 py-3 sm:py-3 text-sm sm:text-base flex-1 sm:flex-none enhanced-button-feedback hover:shadow-lg transform hover:scale-105 touch-manipulation min-h-[48px] sm:min-h-auto"
-                    >
-                      <span className="flex items-center gap-1">
-                        <span>💡</span>
-                        <span className="hidden sm:inline">提示</span>
-                      </span>
-                    </Button>
-                  </div>
-                </div>
-                
-                {/* 出牌提示 */}
-                {showHints && cardHints.length > 0 && (
-                  <div className="w-full max-w-4xl">
-                    <Card className={currentTheme.tableStyle.background === 'bg-gray-900' ? 'bg-gray-800' : 'bg-white'}>
-                      <CardHeader>
-                        <CardTitle className="text-center text-lg">💡 智能出牌提示</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
-                          {cardHints.map((hint, index) => (
-                            <div 
-                              key={index}
-                              className={`p-3 border rounded-lg hover:${currentTheme.tableStyle.background === 'bg-gray-900' ? 'bg-gray-700' : 'bg-blue-50'} cursor-pointer transition-colors ${currentTheme.tableStyle.background === 'bg-gray-900' ? 'border-gray-600' : 'border-gray-200'}`}
-                              onClick={() => applyHint(hint)}
-                            >
-                              <div className="flex items-center justify-between mb-2">
-                                <Badge variant="outline" className="text-xs">
-                                  {hint.type}
-                                </Badge>
-                                <span className="text-xs text-gray-500">
-                                  强度: {hint.strength}
-                                </span>
-                              </div>
-                              <div className="flex gap-1 mb-2">
-                                {hint.cards.map((card, cardIndex) => {
-                                  const isRedSuit = card.suit === "hearts" || card.suit === "diamonds"
-                                  const suitClass = isRedSuit ? "red-suit" : "black-suit"
-                                  
-                                  return (
-                                    <span 
-                                      key={cardIndex}
-                                      className={`card-hint-chip ${suitClass} ${currentTheme.cardStyle.background} ${currentTheme.cardStyle.border} ${currentTheme.cardStyle.text}`}
-                                    >
-                                      {card.display}
-                                      {card.suit === "hearts" && "♥"}
-                                      {card.suit === "diamonds" && "♦"}
-                                      {card.suit === "clubs" && "♣"}
-                                      {card.suit === "spades" && "♠"}
-                                    </span>
-                                  )
-                                })}
-                              </div>
-                              <p className="text-sm text-gray-600">{hint.description}</p>
-                            </div>
-                          ))}
-                        </div>
-                        {cardHints.length === 0 && (
-                          <p className="text-center text-gray-500 py-4">
-                            没有可出的牌，建议跳过回合
-                          </p>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center">
-                <Badge variant="secondary" className="px-4 py-2 status-change">
-                  Waiting for other players...
-                </Badge>
-              </div>
-            )}
-
-            {/* Host control buttons */}
-            {isHost && (
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <div className="flex justify-center gap-3">
-                  <Button 
-                    onClick={startNewGame} 
-                    variant="outline" 
-                    className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
-                  >
-                    🔄 重启游戏
-                  </Button>
-                  <Button 
-                    onClick={endGame} 
-                    variant="destructive" 
-                    className="px-4 py-2"
-                  >
-                    🏁 结束游戏
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <GameOptions isOpen={showOptions} onClose={() => setShowOptions(false)} onSave={setGameOptions} gameId={gameId} />
-        
-        {/* 游戏统计 */}
-        <GameStats 
-          playerName={playerName} 
-          isOpen={showStats} 
-          onClose={() => setShowStats(false)} 
-        />
-        
-        {/* 主题选择器 */}
-        <ThemeSelector
-          isOpen={showThemeSelector}
-          onClose={() => setShowThemeSelector(false)}
-          currentTheme={currentTheme}
-          onThemeChange={changeTheme}
-        />
-        
-        {/* 音效组件 */}
-        <SoundEffects 
-          playCardSound={false}
-          winSound={false}
-          backgroundMusic={backgroundMusic}
-        />
-      </div>
-    </div>
+    <GameLayout
+      gameState={gameState}
+      players={players}
+      myPosition={myPosition}
+      myCards={myCards}
+      selectedCards={selectedCards}
+      isMyTurn={isMyTurn}
+      isHost={isHost}
+      timeRemaining={timeRemaining}
+      isConnected={isConnected}
+      isReconnecting={isReconnecting}
+      backgroundMusic={backgroundMusic}
+      currentTheme={currentTheme}
+      gameOptions={gameOptions}
+      showHints={showHints}
+      cardHints={cardHints}
+      showOptions={showOptions}
+      showStats={showStats}
+      showThemeSelector={showThemeSelector}
+      clickAnimation={clickAnimation}
+      sensors={sensors}
+      onCardClick={handleCardClick}
+      onDragEnd={handleDragEnd}
+      onPlay={handlePlay}
+      onPass={handlePass}
+      onToggleHints={() => setShowHints(!showHints)}
+      onApplyHint={applyHint}
+      onSortCards={(type) => {
+        const sorted = type === 'auto' ? autoArrangeCards(myCards) : sortCards(myCards, type)
+        setMyCards(sorted)
+        setIsManualSort(true)
+      }}
+      onStartNewGame={startNewGame}
+      onEndGame={endGame}
+      onToggleBackgroundMusic={toggleBackgroundMusic}
+      onShowStats={() => setShowStats(true)}
+      onShowThemeSelector={() => setShowThemeSelector(true)}
+      onShowOptions={() => setShowOptions(true)}
+      onManualReconnect={manualReconnect}
+      onCloseOptions={() => setShowOptions(false)}
+      onCloseStats={() => setShowStats(false)}
+      onCloseThemeSelector={() => setShowThemeSelector(false)}
+      onSaveGameOptions={setGameOptions}
+      onThemeChange={changeTheme}
+      gameId={gameId}
+      playerName={playerName}
+    />
   )
 }
