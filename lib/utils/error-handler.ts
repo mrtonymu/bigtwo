@@ -27,12 +27,167 @@ export enum ErrorCode {
   UNKNOWN_ERROR = 'UNKNOWN_ERROR'
 }
 
+export type ErrorLevel = 'info' | 'warn' | 'error' | 'critical';
+
 export interface AppError extends Error {
-  code: ErrorCode
-  message: string
-  details?: any
-  stack?: string
+  level: ErrorLevel;
+  code?: string;
+  timestamp: Date;
+  context?: Record<string, any>;
+  recoveryStrategy?: string;
 }
+
+export class EnhancedErrorHandler {
+  private static instance: EnhancedErrorHandler;
+  private errorListeners: Array<(error: AppError) => void> = [];
+
+  private constructor() {}
+
+  static getInstance(): EnhancedErrorHandler {
+    if (!EnhancedErrorHandler.instance) {
+      EnhancedErrorHandler.instance = new EnhancedErrorHandler();
+    }
+    return EnhancedErrorHandler.instance;
+  }
+
+  // 创建标准化错误对象
+  createError(
+    message: string,
+    level: ErrorLevel = 'error',
+    code?: string,
+    context?: Record<string, any>
+  ): AppError {
+    const error = new Error(message) as AppError;
+    error.level = level;
+    error.code = code;
+    error.timestamp = new Date();
+    error.context = context;
+    return error;
+  }
+
+  // 记录错误日志
+  logError(error: AppError): void {
+    const logEntry = {
+      timestamp: error.timestamp.toISOString(),
+      level: error.level,
+      message: error.message,
+      code: error.code,
+      stack: error.stack,
+      context: error.context,
+    };
+
+    // 在控制台输出错误
+    console.error(`[${error.level.toUpperCase()}] ${error.message}`, logEntry);
+
+    // 通知所有监听器
+    this.errorListeners.forEach(listener => listener(error));
+
+    // 在生产环境中，可能还会发送到日志服务
+    if (process.env.NODE_ENV === 'production') {
+      // 这里可以添加发送到日志服务的代码
+    }
+  }
+
+  // 添加错误监听器
+  addErrorListener(listener: (error: AppError) => void): void {
+    this.errorListeners.push(listener);
+  }
+
+  // 移除错误监听器
+  removeErrorListener(listener: (error: AppError) => void): void {
+    this.errorListeners = this.errorListeners.filter(l => l !== listener);
+  }
+
+  // 尝试恢复错误
+  async attemptRecovery(error: AppError): Promise<boolean> {
+    try {
+      // 根据错误代码执行不同的恢复策略
+      switch (error.code) {
+        case 'NETWORK_ERROR':
+          // 网络错误，可以尝试重新连接
+          console.info('Attempting to recover from network error...');
+          // 这里可以添加重新连接逻辑
+          return true;
+          
+        case 'DB_ERROR':
+          // 数据库错误，可以尝试重新查询
+          console.info('Attempting to recover from database error...');
+          // 这里可以添加重新查询逻辑
+          return true;
+          
+        case 'GAME_STATE_ERROR':
+          // 游戏状态错误，可以尝试重新同步
+          console.info('Attempting to recover from game state error...');
+          // 这里可以添加重新同步逻辑
+          return true;
+          
+        default:
+          // 默认情况下，记录错误但不执行特殊恢复
+          console.warn(`No recovery strategy for error code: ${error.code}`);
+          return false;
+      }
+    } catch (recoveryError) {
+      console.error('Error during recovery attempt:', recoveryError);
+      return false;
+    }
+  }
+
+  // 包装异步操作以进行错误处理
+  async wrapAsync<T>(
+    operation: () => Promise<T>,
+    context?: Record<string, any>
+  ): Promise<T | null> {
+    try {
+      return await operation();
+    } catch (error: any) {
+      const appError: AppError = {
+        ...error,
+        level: error.level || 'error',
+        timestamp: new Date(),
+        context: {
+          ...context,
+          originalError: error.message,
+        },
+      };
+      
+      this.logError(appError);
+      // 显示用户友好的错误消息
+      toast.error(appError.message);
+      await this.attemptRecovery(appError);
+      return null;
+    }
+  }
+
+  // 包装同步操作以进行错误处理
+  wrapSync<T>(
+    operation: () => T,
+    context?: Record<string, any>
+  ): T | null {
+    try {
+      return operation();
+    } catch (error: any) {
+      const appError: AppError = {
+        ...error,
+        level: error.level || 'error',
+        timestamp: new Date(),
+        context: {
+          ...context,
+          originalError: error.message,
+        },
+      };
+      
+      this.logError(appError);
+      // 显示用户友好的错误消息
+      toast.error(appError.message);
+      return null;
+    }
+  }
+}
+
+// 创建全局错误处理实例
+export const errorHandler = EnhancedErrorHandler.getInstance();
+
+
 
 // 错误消息映射
 const ERROR_MESSAGES: Record<ErrorCode, string> = {
@@ -59,7 +214,7 @@ export function createAppError(
 ): AppError {
   const error = new Error(customMessage || ERROR_MESSAGES[code]) as AppError
   error.code = code
-  error.details = details
+  error.context = { details }
   return error
 }
 
@@ -97,7 +252,7 @@ export class ErrorHandler {
     console.error(`[${context || 'App'}] Error:`, {
       code: appError.code,
       message: appError.message,
-      details: appError.details,
+      details: appError.context?.details,
       stack: appError.stack
     })
 
@@ -212,7 +367,7 @@ export class ErrorHandler {
       console.error('Error Details:', {
         code: appError.code,
         message: appError.message,
-        details: appError.details,
+        details: appError.context?.details,
         context,
         stack: appError.stack
       })
@@ -332,7 +487,7 @@ export async function safeAsync<T>(
 }
 
 // React Hook: 统一错误处理
-export function useErrorHandler() {
+export function useErrorHandlerHook() {
   const handleError = (error: any, context?: string) => {
     return ErrorHandler.handle(error, context)
   }

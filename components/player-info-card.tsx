@@ -55,14 +55,15 @@ export function PlayerInfoCard({
         isCurrentPlayer && "border-blue-500 bg-blue-50/90",
         isActivePlayer && "border-green-500 bg-green-50/90 shadow-green-200/50 shadow-lg",
         !isCurrentPlayer && !isActivePlayer && "border-gray-200",
-        "min-w-[100px] max-w-[140px]",
+        "min-w-[80px] max-w-[120px] md:min-w-[100px] md:max-w-[140px]",
+        "touch-manipulation", // 移动端触摸优化
         className
       )}
     >
-      <CardContent className={cn("p-3 flex", getPositionStyles())}>
+      <CardContent className={cn("p-2 md:p-3 flex", getPositionStyles())}>
         {/* 玩家编号 */}
         <div className={cn(
-          "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mb-2",
+          "w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm font-bold mb-1 md:mb-2",
           isCurrentPlayer ? "bg-blue-500 text-white" : 
           isActivePlayer ? "bg-green-500 text-white" : 
           "bg-red-500 text-white"
@@ -71,14 +72,14 @@ export function PlayerInfoCard({
         </div>
 
         {/* 玩家名称 */}
-        <div className="text-center mb-2">
-          <div className="text-xs font-medium text-gray-600 truncate max-w-[80px]">
+        <div className="text-center mb-1 md:mb-2">
+          <div className="text-xs font-medium text-gray-600 truncate max-w-[60px] md:max-w-[80px]">
             {player.name}
           </div>
         </div>
 
         {/* 分数显示 */}
-        <div className="text-center mb-2">
+        <div className="text-center mb-1 md:mb-2">
           <div className="text-xs text-gray-500">Score</div>
           <div className="text-sm font-bold text-gray-800">{score}</div>
         </div>
@@ -87,7 +88,7 @@ export function PlayerInfoCard({
         {turnStatus && (
           <Badge 
             variant={isActivePlayer ? "default" : "secondary"}
-            className="text-xs px-2 py-1 mb-2"
+            className="text-xs px-1.5 py-0.5 md:px-2 md:py-1 mb-1 md:mb-2"
           >
             {turnStatus}
           </Badge>
@@ -103,12 +104,12 @@ export function PlayerInfoCard({
 
         {/* 当前玩家指示器 */}
         {isCurrentPlayer && (
-          <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full animate-pulse" />
+          <div className="absolute -top-1 -right-1 w-2 h-2 md:w-3 md:h-3 bg-blue-500 rounded-full animate-pulse" />
         )}
 
         {/* 活跃玩家指示器 */}
         {isActivePlayer && (
-          <div className="absolute -top-1 -left-1 w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+          <div className="absolute -top-1 -left-1 w-2 h-2 md:w-3 md:h-3 bg-green-500 rounded-full animate-pulse" />
         )}
       </CardContent>
     </Card>
@@ -118,12 +119,12 @@ export function PlayerInfoCard({
 // 玩家信息卡片骨架屏
 export function PlayerInfoCardSkeleton({ position }: { position: "top" | "left" | "right" | "bottom" }) {
   return (
-    <Card className="min-w-[100px] max-w-[140px] bg-gray-100 animate-pulse">
-      <CardContent className="p-3 flex flex-col items-center">
-        <div className="w-8 h-8 rounded-full bg-gray-300 mb-2" />
-        <div className="w-16 h-3 bg-gray-300 rounded mb-2" />
-        <div className="w-12 h-4 bg-gray-300 rounded mb-2" />
-        <div className="w-14 h-5 bg-gray-300 rounded" />
+    <Card className="min-w-[80px] max-w-[120px] md:min-w-[100px] md:max-w-[140px] bg-gray-100 animate-pulse">
+      <CardContent className="p-2 md:p-3 flex flex-col items-center">
+        <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-gray-300 mb-1 md:mb-2" />
+        <div className="w-12 h-2 md:h-3 bg-gray-300 rounded mb-1 md:mb-2" />
+        <div className="w-10 h-3 md:h-4 bg-gray-300 rounded mb-1 md:mb-2" />
+        <div className="w-12 h-4 md:h-5 bg-gray-300 rounded" />
       </CardContent>
     </Card>
   )

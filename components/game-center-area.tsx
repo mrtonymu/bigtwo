@@ -46,15 +46,16 @@ export function GameCenterArea({
       key={`${card.suit}-${card.rank}-${index}`}
       className={cn(
         "relative bg-white rounded-lg border-2 border-gray-300 shadow-md",
-        "w-12 h-16 flex flex-col items-center justify-center",
+        "w-10 h-14 md:w-12 md:h-16 flex flex-col items-center justify-center",
         "text-xs font-bold transition-transform hover:scale-105",
-        index > 0 && "-ml-2" // 重叠效果
+        "touch-manipulation", // 移动端触摸优化
+        index > 0 && "-ml-1 md:-ml-2" // 重叠效果
       )}
       style={{ zIndex: index }}
     >
       <div className={cn("text-center", getSuitColor(card.suit))}>
-        <div className="text-[10px] leading-none">{card.display}</div>
-        <div className="text-sm leading-none">{getSuitSymbol(card.suit)}</div>
+        <div className="text-[8px] md:text-[10px] leading-none">{card.display}</div>
+        <div className="text-sm md:text-base leading-none">{getSuitSymbol(card.suit)}</div>
       </div>
     </div>
   )
@@ -78,42 +79,42 @@ export function GameCenterArea({
   return (
     <Card className={cn(
       "bg-gradient-to-br from-green-100 to-green-200 border-2 border-green-300",
-      "min-h-[200px] flex flex-col justify-center items-center",
+      "min-h-[160px] md:min-h-[200px] flex flex-col justify-center items-center",
       className
     )}>
-      <CardContent className="p-6 w-full">
+      <CardContent className="p-4 md:p-6 w-full">
         {/* 游戏状态和回合信息 */}
-        <div className="flex justify-between items-center mb-4">
-          <Badge className={cn("text-white", statusDisplay.color)}>
+        <div className="flex justify-between items-center mb-3 md:mb-4">
+          <Badge className={cn("text-white text-xs md:text-sm px-2 py-1", statusDisplay.color)}>
             {statusDisplay.text}
           </Badge>
-          <div className="text-sm text-gray-600">
+          <div className="text-xs md:text-sm text-gray-600">
             回合 {currentTurn}
           </div>
         </div>
 
         {/* 中央卡片区域 */}
-        <div className="flex flex-col items-center justify-center min-h-[120px]">
+        <div className="flex flex-col items-center justify-center min-h-[100px] md:min-h-[120px]">
           {lastPlay.length > 0 ? (
             <>
               {/* 上一手牌玩家信息 */}
               {lastPlayerName && (
-                <div className="mb-3 text-center">
-                  <div className="text-sm text-gray-600">上一手牌</div>
-                  <div className="text-lg font-bold text-gray-800">
+                <div className="mb-2 md:mb-3 text-center">
+                  <div className="text-xs md:text-sm text-gray-600">上一手牌</div>
+                  <div className="text-sm md:text-lg font-bold text-gray-800">
                     玩家 {(lastPlayerPosition ?? 0) + 1} - {lastPlayerName}
                   </div>
                 </div>
               )}
 
               {/* 卡片展示 */}
-              <div className="flex items-center justify-center mb-3">
+              <div className="flex items-center justify-center mb-2 md:mb-3">
                 {lastPlay.map((card, index) => renderCard(card, index))}
               </div>
 
               {/* 牌型信息 */}
               <div className="text-center">
-                <Badge variant="outline" className="text-xs">
+                <Badge variant="outline" className="text-xs px-2 py-0.5">
                   {lastPlay.length === 1 ? "单张" :
                    lastPlay.length === 2 ? "对子" :
                    lastPlay.length === 3 ? "三条" :
@@ -125,25 +126,25 @@ export function GameCenterArea({
           ) : (
             /* 无卡片时的占位内容 */
             <div className="text-center text-gray-500">
-              <div className="text-4xl mb-2">🃏</div>
-              <div className="text-lg font-medium">等待出牌</div>
-              <div className="text-sm">玩家可以开始出牌</div>
+              <div className="text-2xl md:text-4xl mb-1 md:mb-2">🃏</div>
+              <div className="text-base md:text-lg font-medium">等待出牌</div>
+              <div className="text-xs md:text-sm">玩家可以开始出牌</div>
             </div>
           )}
         </div>
 
         {/* 游戏历史快速预览 */}
         {playHistory.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-green-300">
-            <div className="text-xs text-gray-600 mb-2">最近动作</div>
-            <div className="flex gap-2 overflow-x-auto">
+          <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-green-300">
+            <div className="text-xs text-gray-600 mb-1 md:mb-2">最近动作</div>
+            <div className="flex gap-1 md:gap-2 overflow-x-auto">
               {playHistory.slice(-3).map((history, index) => (
                 <div
                   key={`${history.turn}-${index}`}
                   className="flex-shrink-0 bg-white/50 rounded px-2 py-1 text-xs"
                 >
-                  <div className="font-medium">{history.playerName}</div>
-                  <div className="text-gray-600">{history.playType}</div>
+                  <div className="font-medium truncate max-w-[60px] md:max-w-[80px]">{history.playerName}</div>
+                  <div className="text-gray-600 truncate max-w-[60px] md:max-w-[80px]">{history.playType}</div>
                 </div>
               ))}
             </div>
@@ -157,21 +158,21 @@ export function GameCenterArea({
 // 游戏中央区域骨架屏
 export function GameCenterAreaSkeleton() {
   return (
-    <Card className="bg-gradient-to-br from-gray-100 to-gray-200 border-2 border-gray-300 min-h-[200px] animate-pulse">
-      <CardContent className="p-6 w-full">
-        <div className="flex justify-between items-center mb-4">
-          <div className="w-16 h-6 bg-gray-300 rounded" />
-          <div className="w-12 h-4 bg-gray-300 rounded" />
+    <Card className="bg-gradient-to-br from-gray-100 to-gray-200 border-2 border-gray-300 min-h-[160px] md:min-h-[200px] animate-pulse">
+      <CardContent className="p-4 md:p-6 w-full">
+        <div className="flex justify-between items-center mb-3 md:mb-4">
+          <div className="w-12 md:w-16 h-4 md:h-6 bg-gray-300 rounded" />
+          <div className="w-10 md:w-12 h-3 md:h-4 bg-gray-300 rounded" />
         </div>
         
-        <div className="flex flex-col items-center justify-center min-h-[120px]">
-          <div className="w-24 h-4 bg-gray-300 rounded mb-3" />
-          <div className="flex gap-2 mb-3">
+        <div className="flex flex-col items-center justify-center min-h-[100px] md:min-h-[120px]">
+          <div className="w-20 md:w-24 h-3 md:h-4 bg-gray-300 rounded mb-2 md:mb-3" />
+          <div className="flex gap-1 md:gap-2 mb-2 md:mb-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="w-12 h-16 bg-gray-300 rounded" />
+              <div key={i} className="w-10 md:w-12 h-14 md:h-16 bg-gray-300 rounded" />
             ))}
           </div>
-          <div className="w-16 h-6 bg-gray-300 rounded" />
+          <div className="w-12 md:w-16 h-4 md:h-6 bg-gray-300 rounded" />
         </div>
       </CardContent>
     </Card>

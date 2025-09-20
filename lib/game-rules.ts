@@ -82,7 +82,7 @@ export const PRESET_RULES: { [key: string]: GameRules } = {
       doubleOnLastCard: false
     },
     scoring: {
-      baseScore: 0,
+      baseScore: 10,  // 修改为大于0的值
       cardCountMultiplier: 1,
       finishBonuses: { first: 0, second: 0 },
       penalties: { lastPlace: 0, tooManyCards: 0 }
@@ -117,7 +117,7 @@ export const PRESET_RULES: { [key: string]: GameRules } = {
       doubleOnLastCard: true
     },
     scoring: {
-      baseScore: 0,
+      baseScore: 10,  // 修改为大于0的值
       cardCountMultiplier: 1,
       finishBonuses: { first: 0 },
       penalties: { lastPlace: 0, tooManyCards: 0 }
@@ -152,7 +152,7 @@ export const PRESET_RULES: { [key: string]: GameRules } = {
       doubleOnLastCard: false
     },
     scoring: {
-      baseScore: 0,
+      baseScore: 10,  // 修改为大于0的值
       cardCountMultiplier: 1,
       finishBonuses: { first: 0 },
       penalties: { lastPlace: 0, tooManyCards: 0 }

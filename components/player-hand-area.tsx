@@ -71,22 +71,26 @@ export function PlayerHandArea({
           "w-14 h-20 flex flex-col items-center justify-center",
           "text-sm font-bold transition-all duration-200",
           "hover:scale-105 hover:shadow-lg",
+          "md:w-16 md:h-24 md:text-base",
+          "lg:w-18 lg:h-26",
           selected ? "border-blue-500 bg-blue-50 -translate-y-2" : "border-gray-300",
           !isMyTurn && "cursor-not-allowed opacity-60",
-          index > 0 && "-ml-2" // 重叠效果
+          index > 0 && "-ml-2", // 重叠效果
+          "touch-manipulation" // 移动端触摸优化
         )}
         style={{ zIndex: selected ? 100 : index }}
         onClick={() => isMyTurn && onCardSelect(card)}
+        onTouchStart={() => isMyTurn && onCardSelect(card)} // 移动端触摸支持
       >
         <div className={cn("text-center", getSuitColor(card.suit))}>
-          <div className="text-xs leading-none">{card.display}</div>
-          <div className="text-lg leading-none">{getSuitSymbol(card.suit)}</div>
+          <div className="text-xs leading-none md:text-sm">{card.display}</div>
+          <div className="text-lg leading-none md:text-xl">{getSuitSymbol(card.suit)}</div>
         </div>
         
         {/* 选中指示器 */}
         {selected && (
-          <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
-            <div className="w-2 h-2 bg-white rounded-full" />
+          <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center md:w-5 md:h-5">
+            <div className="w-2 h-2 bg-white rounded-full md:w-2.5 md:h-2.5" />
           </div>
         )}
       </div>
@@ -101,14 +105,14 @@ export function PlayerHandArea({
     )}>
       <CardContent className="p-4">
         {/* 操作栏 */}
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex flex-wrap justify-between items-center mb-4 gap-2">
           {/* 左侧：排序按钮 */}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-1 md:gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => onSort("auto")}
-              className="text-xs"
+              className="text-xs md:text-sm px-2 py-1 md:px-3 md:py-2"
             >
               自动排序
             </Button>
@@ -116,7 +120,7 @@ export function PlayerHandArea({
               variant="outline"
               size="sm"
               onClick={() => onSort("suit")}
-              className="text-xs"
+              className="text-xs md:text-sm px-2 py-1 md:px-3 md:py-2"
             >
               花色
             </Button>
@@ -124,19 +128,19 @@ export function PlayerHandArea({
               variant="outline"
               size="sm"
               onClick={() => onSort("rank")}
-              className="text-xs"
+              className="text-xs md:text-sm px-2 py-1 md:px-3 md:py-2"
             >
               点数
             </Button>
           </div>
 
           {/* 中间：手牌信息 */}
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="text-xs">
+          <div className="flex items-center gap-1 md:gap-2">
+            <Badge variant="secondary" className="text-xs md:text-sm px-2 py-0.5">
               手牌: {cards.length}
             </Badge>
             {selectedCards.length > 0 && (
-              <Badge variant="default" className="text-xs">
+              <Badge variant="default" className="text-xs md:text-sm px-2 py-0.5">
                 已选: {selectedCards.length}
               </Badge>
             )}
@@ -148,7 +152,7 @@ export function PlayerHandArea({
               variant="outline"
               size="sm"
               onClick={() => setShowHints(!showHints)}
-              className="text-xs"
+              className="text-xs md:text-sm px-2 py-1 md:px-3 md:py-2"
             >
               提示 ({hints.length})
             </Button>
@@ -161,7 +165,7 @@ export function PlayerHandArea({
             <div className="text-sm font-medium text-yellow-800 mb-2">出牌建议:</div>
             <div className="space-y-1">
               {hints.slice(0, 3).map((hint, index) => (
-                <div key={index} className="text-xs text-yellow-700">
+                <div key={index} className="text-xs text-yellow-700 md:text-sm">
                   <span className="font-medium">{hint.type}</span>: {hint.description}
                 </div>
               ))}
@@ -181,7 +185,7 @@ export function PlayerHandArea({
           <Button
             onClick={onPlay}
             disabled={!canPlay || !isMyTurn || selectedCards.length === 0}
-            className="px-8 py-2"
+            className="px-6 py-2 md:px-8 md:py-3 text-sm md:text-base"
           >
             出牌
           </Button>
@@ -189,7 +193,7 @@ export function PlayerHandArea({
             variant="outline"
             onClick={onPass}
             disabled={!canPass || !isMyTurn}
-            className="px-8 py-2"
+            className="px-6 py-2 md:px-8 md:py-3 text-sm md:text-base"
           >
             过牌
           </Button>
@@ -198,11 +202,11 @@ export function PlayerHandArea({
         {/* 回合状态提示 */}
         <div className="mt-3 text-center">
           {isMyTurn ? (
-            <div className="text-sm text-green-600 font-medium">
+            <div className="text-sm text-green-600 font-medium md:text-base">
               轮到你了！请选择卡片出牌或过牌
             </div>
           ) : (
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-gray-500 md:text-base">
               等待其他玩家操作...
             </div>
           )}

@@ -8,7 +8,7 @@ import { GameBrowser } from "@/components/game-browser"
 import { GameOptions, type GameOptions as GameOptionsType, loadGameOptions } from "@/components/game-options"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
-import { useErrorHandler } from "@/lib/utils/error-handler"
+import { useErrorHandlerHook } from "@/lib/utils/error-handler"
 import toast from "react-hot-toast"
 import { validatePlayerName, validateRoomName, InputSanitizer } from "@/lib/utils/input-validator"
 import { CNFLIXLogo } from "@/components/cnflix-logo"
@@ -34,7 +34,7 @@ export function GameLobby() {
     }
   })
   const supabase = createClient()
-  const { handleSupabaseError } = useErrorHandler()
+  const { handleSupabaseError } = useErrorHandlerHook()
   const router = useRouter()
 
 

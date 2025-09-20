@@ -631,11 +631,12 @@ function findPairs(cards: Card[]): CardHint[] {
   
   Object.entries(rankCounts).forEach(([rank, count]) => {
     if (count >= 2) {
-      const pairCards = cards.filter(c => c.rank === parseInt(rank)).slice(0, 2)
+      const pairCards = cards.filter(c => c.rank === Number(rank)).slice(0, 2)
+      const strength = getPlayStrength(pairCards)
       pairs.push({
         cards: pairCards,
         type: "对子",
-        strength: getCardValue(pairCards[0]),
+        strength: strength,
         description: `出对子 ${pairCards[0].display}${pairCards[1].display}`
       })
     }
@@ -653,7 +654,7 @@ function findThreeOfAKind(cards: Card[]): CardHint[] {
   
   Object.entries(rankCounts).forEach(([rank, count]) => {
     if (count >= 3) {
-      const threeCards = cards.filter(c => c.rank === parseInt(rank)).slice(0, 3)
+      const threeCards = cards.filter(c => c.rank === Number(rank)).slice(0, 3)
       threes.push({
         cards: threeCards,
         type: "三条",
@@ -724,8 +725,8 @@ function findFullHouses(cards: Card[]): CardHint[] {
   threeRanks.forEach(([threeRank]) => {
     pairRanks.forEach(([pairRank]) => {
       if (threeRank !== pairRank) {
-        const threeCards = cards.filter(c => c.rank === parseInt(threeRank)).slice(0, 3)
-        const pairCards = cards.filter(c => c.rank === parseInt(pairRank)).slice(0, 2)
+        const threeCards = cards.filter(c => c.rank === Number(threeRank)).slice(0, 3)
+        const pairCards = cards.filter(c => c.rank === Number(pairRank)).slice(0, 2)
         fullHouses.push({
           cards: [...threeCards, ...pairCards],
           type: "葫芦",
@@ -748,7 +749,7 @@ function findFourOfAKind(cards: Card[]): CardHint[] {
   
   Object.entries(rankCounts).forEach(([rank, count]) => {
     if (count >= 4) {
-      const fourCards = cards.filter(c => c.rank === parseInt(rank)).slice(0, 4)
+      const fourCards = cards.filter(c => c.rank === Number(rank)).slice(0, 4)
       fours.push({
         cards: fourCards,
         type: "四条",
@@ -774,8 +775,8 @@ function findFourOfAKindPlusOne(cards: Card[]): CardHint[] {
   fourRanks.forEach(([fourRank]) => {
     singleRanks.forEach(([singleRank]) => {
       if (fourRank !== singleRank) {
-        const fourCards = cards.filter(c => c.rank === parseInt(fourRank)).slice(0, 4)
-        const singleCard = cards.find(c => c.rank === parseInt(singleRank))
+        const fourCards = cards.filter(c => c.rank === Number(fourRank)).slice(0, 4)
+        const singleCard = cards.find(c => c.rank === Number(singleRank))
         if (singleCard) {
           fourPlusOnes.push({
             cards: [...fourCards, singleCard],
@@ -859,4 +860,410 @@ function findStraightFlushes(cards: Card[]): CardHint[] {
   })
   
   return straightFlushes
+}
+
+// Enhanced game rules validation interface
+export interface GameRules {
+  allowLeadingThree: boolean // 是否允许3开头
+  allowDiamondThreeStart: boolean // 2-3人游戏是否必须从♦3开始
+  spadeRestriction: boolean // 是否启用黑桃规则（不能留单张黑桃）
+  consecutivePlays: boolean // 是否允许连续出牌
+  timeLimit: number // 出牌时间限制（秒）
+  maxPasses: number // 最大跳过次数
+  advancedScoring: boolean // 是否启用高级计分
+}
+
+// Default game rules
+export const DEFAULT_GAME_RULES: GameRules = {
+  allowLeadingThree: true,
+  allowDiamondThreeStart: true,
+  spadeRestriction: true,
+  consecutivePlays: false,
+  timeLimit: 30,
+  maxPasses: 3,
+  advancedScoring: false
+}
+
+// Enhanced validation for complex game rules
+export function validateGameRules(cards: Card[], lastPlay: Card[], playerCount: number, rules: GameRules, gameState?: GameState): boolean {
+  // Basic validation
+  if (!isValidCombination(cards)) return false
+  
+  // Check if it's the first play
+  if (!lastPlay || lastPlay.length === 0) {
+    return validateFirstPlay(cards, playerCount, rules)
+  }
+  
+  // Must play same number of cards
+  if (cards.length !== lastPlay.length) return false
+  
+  // Must be higher than last play
+  if (!isHigherCombination(cards, lastPlay)) return false
+  
+  // Additional rule validations
+  if (rules.spadeRestriction && !validateSpadeRestriction(cards, gameState)) return false
+  
+  return true
+}
+
+// Validate first play according to game rules
+function validateFirstPlay(cards: Card[], playerCount: number, rules: GameRules): boolean {
+  // For 2-3 player games, check if ♦3 is required
+  if (playerCount < 4 && rules.allowDiamondThreeStart) {
+    return isValidCombination(cards) && hasDiamond3(cards)
+  }
+  
+  // For 4 player games or when ♦3 is not required
+  return isValidCombination(cards)
+}
+
+// Validate spade restriction rule
+function validateSpadeRestriction(cards: Card[], gameState?: GameState): boolean {
+  // This rule applies when a player is about to play their last card
+  // We would need to check the player's remaining cards to implement this properly
+  // For now, we'll assume this validation happens at the game level
+  return true
+}
+
+// Enhanced straight validation for Big Two
+export function isStraightBigTwo(cards: Card[]): boolean {
+  if (cards.length !== 5) return false
+  
+  // Sort cards by rank with special handling for Big Two
+  const sorted = [...cards].sort((a, b) => {
+    // In Big Two: 3 < 4 < 5 < 6 < 7 < 8 < 9 < 10 < J < Q < K < A < 2
+    const rankA = a.rank === 2 ? 15 : a.rank // 2 is highest
+    const rankB = b.rank === 2 ? 15 : b.rank
+    return rankA - rankB
+  })
+  
+  const ranks = sorted.map(c => c.rank)
+  
+  // Check for standard straight (no 2 involved)
+  if (!ranks.includes(2)) {
+    for (let i = 1; i < ranks.length; i++) {
+      if (ranks[i] !== ranks[i-1] + 1) {
+        return false
+      }
+    }
+    return true
+  }
+  
+  // Special cases involving 2
+  // A-2-3-4-5 is NOT a valid straight in Big Two
+  // 10-J-Q-K-A is a valid straight
+  if (ranks.includes(14) && ranks.includes(2)) {
+    // Cannot have both A and 2 in a straight
+    return false
+  }
+  
+  // Check 10-J-Q-K-A straight
+  if (ranks.includes(10) && ranks.includes(11) && ranks.includes(12) && ranks.includes(13) && ranks.includes(14)) {
+    return true
+  }
+  
+  return false
+}
+
+// Enhanced flush validation
+export function isFlushBigTwo(cards: Card[]): boolean {
+  if (cards.length !== 5) return false
+  return cards.every(card => card.suit === cards[0].suit)
+}
+
+// Enhanced straight flush validation
+export function isStraightFlushBigTwo(cards: Card[]): boolean {
+  return isStraightBigTwo(cards) && isFlushBigTwo(cards)
+}
+
+// Enhanced four of a kind validation
+export function isFourOfAKindBigTwo(cards: Card[]): boolean {
+  if (cards.length !== 5) return false
+  
+  const ranks = cards.map(c => c.rank)
+  const rankCounts = ranks.reduce((acc, rank) => {
+    acc[rank] = (acc[rank] || 0) + 1
+    return acc
+  }, {} as Record<number, number>)
+  
+  const counts = Object.values(rankCounts)
+  return counts.length === 2 && (counts.includes(4) && counts.includes(1))
+}
+
+// Enhanced full house validation
+export function isFullHouseBigTwo(cards: Card[]): boolean {
+  if (cards.length !== 5) return false
+  
+  const ranks = cards.map(c => c.rank)
+  const rankCounts = ranks.reduce((acc, rank) => {
+    acc[rank] = (acc[rank] || 0) + 1
+    return acc
+  }, {} as Record<number, number>)
+  
+  const counts = Object.values(rankCounts)
+  return counts.length === 2 && (counts.includes(3) && counts.includes(2))
+}
+
+// Get enhanced play type name
+export function getPlayTypeNameEnhanced(cards: Card[]): string {
+  if (cards.length === 0) return "Pass"
+  if (cards.length === 1) return "单牌"
+  if (cards.length === 2) return "对子"
+  if (cards.length === 3) return "三条"
+  if (cards.length === 5) {
+    if (isStraightFlushBigTwo(cards)) return "同花顺"
+    if (isFourOfAKindBigTwo(cards)) return "金刚"
+    if (isFullHouseBigTwo(cards)) return "葫芦"
+    if (isFlushBigTwo(cards)) return "同花"
+    if (isStraightBigTwo(cards)) return "顺子"
+  }
+  return "未知"
+}
+
+// Enhanced card comparison for Big Two
+export function getCardValueBigTwo(card: Card): number {
+  // Suit order: diamonds < clubs < hearts < spades (方块 < 梅花 < 红心 < 黑桃)
+  const suitValue = ["diamonds", "clubs", "hearts", "spades"].indexOf(card.suit)
+  
+  // Rank order: 3 < 4 < 5 < 6 < 7 < 8 < 9 < 10 < J < Q < K < A < 2
+  // 2 is the highest, so it gets the highest value
+  let rankValue: number
+  if (card.rank === 2) {
+    rankValue = 12 // 2 is highest
+  } else if (card.rank === 14) {
+    rankValue = 11 // A is second highest
+  } else {
+    rankValue = card.rank - 3 // 3=0, 4=1, ..., K=10
+  }
+  
+  return rankValue * 4 + suitValue
+}
+
+// Enhanced hand value calculation for Big Two
+export function getHandValueBigTwo(cards: Card[]): number {
+  if (cards.length !== 5) return 0
+  
+  const sorted = [...cards].sort((a, b) => getCardValueBigTwo(a) - getCardValueBigTwo(b))
+  
+  // Check hand types in order of strength
+  if (isStraightFlushBigTwo(cards)) {
+    return 90000 + getCardValueBigTwo(sorted[4]) // Highest card value
+  }
+  
+  if (isFourOfAKindBigTwo(cards)) {
+    return 80000 + getCardValueBigTwo(sorted[2]) // Middle card is part of the four
+  }
+  
+  if (isFullHouseBigTwo(cards)) {
+    return 70000 + getCardValueBigTwo(sorted[2]) // Middle card is part of the three
+  }
+  
+  if (isFlushBigTwo(cards)) {
+    return 60000 + getCardValueBigTwo(sorted[4]) // Highest card value
+  }
+  
+  if (isStraightBigTwo(cards)) {
+    return 50000 + getCardValueBigTwo(sorted[4]) // Highest card value
+  }
+  
+  return 0 // Not a valid 5-card hand
+}
+
+// Enhanced validation for consecutive plays
+export function canPlayConsecutive(cards: Card[], lastPlay: Card[], rules: GameRules): boolean {
+  if (!rules.consecutivePlays) return false
+  
+  // Check if both plays are of the same type
+  const currentType = getPlayTypeNameEnhanced(cards)
+  const lastType = getPlayTypeNameEnhanced(lastPlay)
+  
+  if (currentType !== lastType) return false
+  
+  // Check if the current play is higher than the last play
+  return getHandValueBigTwo(cards) > getHandValueBigTwo(lastPlay)
+}
+
+// Enhanced hint generation with complex rules
+export function getCardHintsEnhanced(myCards: Card[], lastPlay: Card[], playerCount: number, rules: GameRules): CardHint[] {
+  const hints: CardHint[] = []
+  
+  if (!lastPlay || lastPlay.length === 0) {
+    // First play - generate hints based on rules
+    return getFirstPlayHintsEnhanced(myCards, rules)
+  }
+  
+  // Generate hints based on last play and rules
+  const lastPlayType = getPlayTypeNameEnhanced(lastPlay)
+  const lastPlayStrength = getHandValueBigTwo(lastPlay)
+  
+  // Find valid combinations that beat the last play
+  const validCombinations = findValidCombinations(myCards, lastPlay.length, lastPlay, rules)
+  
+  validCombinations.forEach(combo => {
+    hints.push({
+      cards: combo,
+      type: getPlayTypeNameEnhanced(combo),
+      strength: getHandValueBigTwo(combo),
+      description: `出${getPlayTypeNameEnhanced(combo)} ${combo.map(c => c.display).join('')}`
+    })
+  })
+  
+  // Sort by strength and return top 5
+  return hints.sort((a, b) => a.strength - b.strength).slice(0, 5)
+}
+
+// Enhanced first play hints
+function getFirstPlayHintsEnhanced(myCards: Card[], rules: GameRules): CardHint[] {
+  const hints: CardHint[] = []
+  
+  // Generate single card hints
+  myCards.forEach(card => {
+    hints.push({
+      cards: [card],
+      type: "单牌",
+      strength: getCardValueBigTwo(card),
+      description: `出单张 ${card.display}`
+    })
+  })
+  
+  // Generate pair hints
+  const pairs = findPairs(myCards)
+  hints.push(...pairs)
+  
+  // Generate three of a kind hints
+  const threes = findThreeOfAKind(myCards)
+  hints.push(...threes)
+  
+  // Generate five card hand hints
+  const fiveCardHands = findFiveCardHands(myCards)
+  hints.push(...fiveCardHands)
+  
+  return hints.slice(0, 5)
+}
+
+// Find valid combinations based on rules
+function findValidCombinations(cards: Card[], length: number, lastPlay: Card[], rules: GameRules): Card[][] {
+  const combinations: Card[][] = []
+  
+  if (length === 1) {
+    // Find single cards that beat the last play
+    cards.filter(card => getCardValueBigTwo(card) > getCardValueBigTwo(lastPlay[0]))
+         .forEach(card => combinations.push([card]))
+  } else if (length === 2) {
+    // Find pairs that beat the last play
+    const pairs = findPairs(cards)
+    pairs.filter(pair => pair.strength > getCardValueBigTwo(lastPlay[0]))
+         .forEach(pair => combinations.push(pair.cards))
+  } else if (length === 3) {
+    // Find three of a kind that beat the last play
+    const threes = findThreeOfAKind(cards)
+    threes.filter(three => three.strength > getCardValueBigTwo(lastPlay[0]))
+          .forEach(three => combinations.push(three.cards))
+  } else if (length === 5) {
+    // Find five card hands that beat the last play
+    const fiveCardHands = findFiveCardHands(cards)
+    fiveCardHands.filter(hand => getHandValueBigTwo(hand.cards) > getHandValueBigTwo(lastPlay))
+                 .forEach(hand => combinations.push(hand.cards))
+  }
+  
+  return combinations
+}
+
+// Find five card hands
+function findFiveCardHands(cards: Card[]): CardHint[] {
+  const hands: CardHint[] = []
+  
+  // Generate all possible 5-card combinations
+  const combinations = generateCombinations(cards, 5)
+  
+  combinations.forEach(combo => {
+    if (isFiveCardHand(combo)) {
+      hands.push({
+        cards: combo,
+        type: getPlayTypeNameEnhanced(combo),
+        strength: getHandValueBigTwo(combo),
+        description: `出${getPlayTypeNameEnhanced(combo)} ${combo.map(c => c.display).join('')}`
+      })
+    }
+  })
+  
+  return hands
+}
+
+// Generate combinations of specified length
+function generateCombinations<T>(array: T[], length: number): T[][] {
+  if (length === 1) return array.map(item => [item])
+  
+  const combinations: T[][] = []
+  for (let i = 0; i <= array.length - length; i++) {
+    const head = array[i]
+    const tailCombinations = generateCombinations(array.slice(i + 1), length - 1)
+    tailCombinations.forEach(tail => {
+      combinations.push([head, ...tail])
+    })
+  }
+  return combinations
+}
+
+// Enhanced auto play suggestion with complex rules
+export function getAutoPlaySuggestionEnhanced(myCards: Card[], lastPlay: Card[], playerCount: number, rules: GameRules): Card[] | null {
+  // If no last play, choose the smallest single card
+  if (!lastPlay || lastPlay.length === 0) {
+    const sortedCards = [...myCards].sort((a, b) => getCardValueBigTwo(a) - getCardValueBigTwo(b))
+    return [sortedCards[0]]
+  }
+  
+  // Get all valid hints based on enhanced rules
+  const hints = getCardHintsEnhanced(myCards, lastPlay, playerCount, rules)
+  
+  if (hints.length === 0) {
+    return null // No valid plays, should pass
+  }
+  
+  // Smart selection strategy:
+  // 1. Prefer plays that clear the most cards
+  // 2. Avoid breaking up strong combinations
+  // 3. Consider remaining cards
+  
+  // For now, return the lowest strength valid play
+  return hints[0].cards
+}
+
+// Validate if a play follows all game rules
+export function validatePlayWithRules(cards: Card[], lastPlay: Card[], playerCount: number, rules: GameRules, gameState?: GameState): { valid: boolean; reason?: string } {
+  // Empty play is a pass
+  if (cards.length === 0) {
+    return { valid: true, reason: "跳过回合" }
+  }
+  
+  // Check basic combination validity
+  if (!isValidCombination(cards)) {
+    return { valid: false, reason: "无效的牌型" }
+  }
+  
+  // First play validation
+  if (!lastPlay || lastPlay.length === 0) {
+    if (playerCount < 4 && rules.allowDiamondThreeStart && !hasDiamond3(cards)) {
+      return { valid: false, reason: "2-3人游戏必须从♦3开始" }
+    }
+    return { valid: true, reason: "首发出牌有效" }
+  }
+  
+  // Same number of cards required
+  if (cards.length !== lastPlay.length) {
+    return { valid: false, reason: "必须出相同数量的牌" }
+  }
+  
+  // Must be higher than last play
+  if (!isHigherCombination(cards, lastPlay)) {
+    return { valid: false, reason: "牌力不够大" }
+  }
+  
+  // Spade restriction check
+  if (rules.spadeRestriction) {
+    // This would need access to the player's remaining cards to validate properly
+    // For now, we'll assume this is checked at the game level
+  }
+  
+  return { valid: true, reason: "出牌有效" }
 }

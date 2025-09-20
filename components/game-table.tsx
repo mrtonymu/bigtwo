@@ -1,9 +1,12 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 
-import { type Card as GameCard, type Player, type GameState, type PlayHistory, type CardHint, isValidPlay, createDeck, dealCards, sortCards, autoArrangeCards, getPlayTypeName, getCardHints, getAutoPlaySuggestion, shouldAutoPass } from "@/lib/game-logic"
-import { useErrorHandler } from '@/lib/utils/error-handler'
+import { type Card as GameCard, type Player, type GameState, type PlayHistory, type CardHint, isValidPlay, createDeck, dealCards, sortCards, autoArrangeCards, getPlayTypeName, getCardHints, getAutoPlaySuggestion, shouldAutoPass,
+  // 导入新添加的增强游戏规则函数
+  validatePlayWithRules, getPlayTypeNameEnhanced, getAutoPlaySuggestionEnhanced, DEFAULT_GAME_RULES
+} from "@/lib/game-logic"
+import { useErrorHandlerHook } from '@/lib/utils/error-handler'
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -86,7 +89,9 @@ function DraggableCard({ card, index, isSelected, onClick, currentTheme, clickAn
       text-xs sm:text-sm 
       touch-manipulation 
       active:scale-95 
-      transition-all duration-200`}
+      transition-all duration-200
+      md:min-h-[85px] lg:min-h-[90px]
+      focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50`}
       data-animation-delay={index * 50}
     >
       <div className="flex flex-col items-center justify-center h-full p-1 sm:p-2">
@@ -108,6 +113,17 @@ function DraggableCard({ card, index, isSelected, onClick, currentTheme, clickAn
       </div>
     </button>
   )
+}
+
+// 添加游戏规则类型定义
+interface GameRules {
+  allowLeadingThree: boolean
+  allowDiamondThreeStart: boolean
+  spadeRestriction: boolean
+  consecutivePlays: boolean
+  timeLimit: number
+  maxPasses: number
+  advancedScoring: boolean
 }
 
 export function GameTable({ gameId, playerName }: GameTableProps) {
@@ -134,6 +150,8 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       autoArrange: true,
     }
   })
+  // 添加游戏规则状态
+  const [gameRules, setGameRules] = useState(DEFAULT_GAME_RULES)
   const [showGameStart, setShowGameStart] = useState(false)
   const [isHost, setIsHost] = useState(false)
   const [turnTimer, setTurnTimer] = useState<number | null>(null)
@@ -185,7 +203,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
   const { currentTheme, changeTheme } = useTheme()
 
   // 错误处理
-  const { handleGameError, handleNetworkError, showSuccess, showLoading, dismissLoading } = useErrorHandler()
+  const { handleGameError, handleNetworkError, showSuccess, showLoading, dismissLoading } = useErrorHandlerHook()
   
   // 音效
   const { playClickSound, playSuccessSound, playErrorSound, backgroundMusic, toggleBackgroundMusic } = useSoundEffects()
@@ -303,9 +321,14 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
 
       if (playersResult.error) throw playersResult.error
       
-      // 同步游戏选项
+      // 同步游戏选项和游戏规则
       if (gameResult.data?.game_options) {
         setGameOptions(gameResult.data.game_options)
+      }
+      
+      // 同步游戏规则
+      if (gameResult.data?.game_rules) {
+        setGameRules(gameResult.data.game_rules)
       }
       
       const playersData = playersResult.data || []
@@ -430,19 +453,48 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
         handleGameError(error, "获取游戏数据失败")
       setIsLoading(false)
     }
-  }, [gameId, playerName, gameOptions.autoArrange, gameOptions.cardSorting, gameWinner, isManualSort, supabase])
+  }, [gameId, playerName, gameOptions.autoArrange, gameOptions.cardSorting, gameWinner, isManualSort, supabase, playSuccessSound, handleGameError, startTurnTimer, stopTurnTimer, generateCardHints])
 
+  // 创建防抖函数来减少 fetchGameData 的调用频率
+  const debounceFetch = useCallback(() => {
+    let timeoutId: NodeJS.Timeout | null = null;
+    
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      timeoutId = setTimeout(() => {
+        fetchGameData();
+        timeoutId = null;
+      }, 100); // 100ms 防抖延迟
+    };
+  }, [fetchGameData]);
+  
+  const debouncedFetchGameData = useMemo(debounceFetch, [fetchGameData]);
+  
+  // 优化的获取游戏数据函数
+  const optimizedFetchGameData = useCallback(async () => {
+    // 避免在游戏开始界面显示时重复获取数据
+    if (showGameStart) {
+      return;
+    }
+    
+    // 使用防抖函数
+    debouncedFetchGameData();
+  }, [showGameStart, debouncedFetchGameData]);
+  
+  // 修改现有的 useEffect 中的订阅回调函数
   useEffect(() => {
     // Subscribe to game updates - 使用安全的订阅管理
     const channel = supabase
       .channel(`game-${gameId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "players", filter: `game_id=eq.${gameId}` }, () =>
-        fetchGameData(),
+        optimizedFetchGameData(),
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "game_state", filter: `game_id=eq.${gameId}` },
-        () => fetchGameData(),
+        () => optimizedFetchGameData(),
       )
       .on(
         "postgres_changes",
@@ -456,7 +508,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
           if (payload.new && (payload.new as any).status) {
             // 如果游戏状态变为finished，立即获取最新数据
             if ((payload.new as any).status === "finished") {
-              setTimeout(() => fetchGameData(), 100)
+              setTimeout(() => optimizedFetchGameData(), 100)
             }
           }
         }
@@ -469,12 +521,12 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
     })
 
     // Initial data fetch
-    fetchGameData()
+    optimizedFetchGameData()
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [gameId, playerName, fetchGameData, addSubscription])
+  }, [gameId, playerName, optimizedFetchGameData, addSubscription])
 
   // 保存手牌到数据库的辅助函数 - 已被智能同步取代
   const saveCardsToDatabase = async (cards: GameCard[], action: string) => {
@@ -555,8 +607,8 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
         return
       }
 
-      // 获取智能出牌建议
-      const suggestedCards = getAutoPlaySuggestion(myCards, gameState.lastPlay, players.length)
+      // 获取智能出牌建议（使用增强的规则）
+      const suggestedCards = getAutoPlaySuggestionEnhanced(myCards, gameState.lastPlay, players.length, gameRules)
       
       if (!suggestedCards || suggestedCards.length === 0) {
         await handlePass()
@@ -570,17 +622,25 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
       setTimeout(async () => {
         // 验证出牌
         const remainingCards = myCards.filter(
-          (card) => !suggestedCards.some((selected) => selected.suit === card.suit && selected.rank === card.rank),
+          (card) => !suggestedCards.some((selected: GameCard) => selected.suit === card.suit && selected.rank === card.rank),
         )
 
-        if (!isValidPlay(suggestedCards, gameState.lastPlay, players.length, remainingCards)) {
+        const validation = validatePlayWithRules(
+          suggestedCards, 
+          gameState.lastPlay, 
+          players.length, 
+          gameRules,
+          { ...gameState, playHistory: gameState.playHistory || [] }
+        )
+        
+        if (!validation.valid) {
           await handlePass()
           return
         }
 
         // 执行出牌逻辑（复用handlePlay的逻辑）
         const newCards = myCards.filter(
-          (card) => !suggestedCards.some((selected) => selected.suit === card.suit && selected.rank === card.rank),
+          (card) => !suggestedCards.some((selected: GameCard) => selected.suit === card.suit && selected.rank === card.rank),
         )
 
         // 更新玩家手牌
@@ -608,7 +668,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
             playerName: playerName,
             playerPosition: myPosition,
             cards: suggestedCards,
-            playType: getPlayTypeName(suggestedCards),
+            playType: getPlayTypeNameEnhanced(suggestedCards), // 使用增强的牌型名称
             timestamp: new Date().toISOString(),
           }
         ]
@@ -657,24 +717,28 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
     try {
       // Calculate remaining cards after this play
       const remainingCards = myCards.filter(
-        (card) => !selectedCards.some((selected) => selected.suit === card.suit && selected.rank === card.rank),
+        (card) => !selectedCards.some((selected: GameCard) => selected.suit === card.suit && selected.rank === card.rank),
       )
 
-      // Validate play
-      if (!isValidPlay(selectedCards, gameState.lastPlay, players.length, remainingCards)) {
+      // 使用增强的规则验证出牌
+      const validation = validatePlayWithRules(
+        selectedCards, 
+        gameState.lastPlay, 
+        players.length, 
+        gameRules,
+        { ...gameState, playHistory: gameState.playHistory || [] }
+      )
+      
+      if (!validation.valid) {
         triggerInvalidPlayAnimation()
         playErrorSound()
-        if (remainingCards.length === 1 && remainingCards[0].suit === "spades") {
-          toast.error("不能留下单张♠作为最后一张牌！")
-        } else {
-          toast.error("出牌无效！请选择有效的牌型")
-        }
+        toast.error(validation.reason || "出牌无效！请选择有效的牌型")
         return
       }
 
       // Update player's cards
       const newCards = myCards.filter(
-        (card) => !selectedCards.some((selected) => selected.suit === card.suit && selected.rank === card.rank),
+        (card) => !selectedCards.some((selected: GameCard) => selected.suit === card.suit && selected.rank === card.rank),
       )
 
       // Update player
@@ -702,7 +766,7 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
           playerName: playerName,
           playerPosition: myPosition,
           cards: selectedCards,
-          playType: getPlayTypeName(selectedCards),
+          playType: getPlayTypeNameEnhanced(selectedCards), // 使用增强的牌型名称
           timestamp: new Date().toISOString(),
         }
       ]
@@ -869,34 +933,50 @@ export function GameTable({ gameId, playerName }: GameTableProps) {
   }
 
   // Show game start message if game just started (only show briefly)
+  const [hasShownGameStart, setHasShownGameStart] = useState(false);
+  
   useEffect(() => {
     // 只有在游戏真正刚开始时（turnCount为0且之前没有显示过）才显示游戏开始消息
-    // 添加额外的检查：确保游戏状态存在且手牌已分发
-    if (gameState && gameState.turnCount === 0 && myCards.length > 0 && !showGameStart) {
-      setShowGameStart(true)
+    if (gameState && gameState.turnCount === 0 && myCards.length > 0 && !hasShownGameStart) {
+      setShowGameStart(true);
+      setHasShownGameStart(true);
       // Auto hide after 3 seconds
       const timer = setTimeout(() => {
-        setShowGameStart(false)
-      }, 3000)
-      return () => clearTimeout(timer)
+        setShowGameStart(false);
+      }, 3000);
+      return () => clearTimeout(timer);
     }
     // 当游戏开始后（turnCount > 0），确保隐藏游戏开始界面
     else if (gameState && gameState.turnCount > 0 && showGameStart) {
-      setShowGameStart(false)
+      setShowGameStart(false);
     }
     // 添加额外的条件：如果游戏状态存在但手牌为空，也隐藏开始界面
     else if (gameState && myCards.length === 0 && showGameStart) {
-      setShowGameStart(false)
+      setShowGameStart(false);
     }
     // 添加额外的条件：如果玩家位置已确定且手牌已分发，隐藏开始界面
     else if (myPosition !== -1 && myCards.length > 0 && showGameStart) {
-      setShowGameStart(false)
+      setShowGameStart(false);
     }
     // 添加额外的条件：如果玩家位置为-1（未找到玩家），也隐藏开始界面
     else if (myPosition === -1 && showGameStart) {
-      setShowGameStart(false)
+      setShowGameStart(false);
     }
-  }, [gameState?.turnCount, myCards.length, showGameStart, myPosition])
+  }, [gameState?.turnCount, myCards.length, showGameStart, myPosition, hasShownGameStart]);
+
+  // 重置游戏开始显示状态的函数
+  const resetGameStartDisplay = useCallback(() => {
+    setHasShownGameStart(false);
+    setShowGameStart(false);
+  }, []);
+
+  // 添加一个useEffect来监听游戏状态变化并重置显示状态
+  useEffect(() => {
+    // 当游戏状态变为进行中时，确保重置游戏开始显示状态
+    if (gameState?.turnCount === 0) {
+      resetGameStartDisplay();
+    }
+  }, [gameState?.turnCount, resetGameStartDisplay]);
 
   // Debug logging
   console.log('GameTable Debug:', {

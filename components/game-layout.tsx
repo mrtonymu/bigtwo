@@ -144,7 +144,7 @@ export function GameLayout({
       {/* 游戏布局 */}
       <div className="relative z-10 h-screen flex flex-col">
         {/* 顶部玩家区域 */}
-         <div className="flex-1 flex items-start justify-center pt-8">
+         <div className="flex-1 flex items-start justify-center pt-4 md:pt-8">
            {otherPlayers.length > 0 && (
              <PlayerInfoCard
                player={otherPlayers[0]}
@@ -153,6 +153,7 @@ export function GameLayout({
                isActivePlayer={gameState.currentPlayer === players.indexOf(otherPlayers[0])}
                turnStatus={gameState.currentPlayer === players.indexOf(otherPlayers[0]) ? "出牌中" : "等待"}
                cardCount={otherPlayers[0].cards.length}
+               className="w-32 md:w-40"
              />
            )}
          </div>
@@ -160,7 +161,7 @@ export function GameLayout({
          {/* 中间游戏区域 */}
          <div className="flex-1 flex items-center">
            {/* 左侧玩家 */}
-           <div className="flex-1 flex justify-start pl-8">
+           <div className="flex-1 flex justify-start pl-4 md:pl-8">
              {otherPlayers.length > 1 && (
                <PlayerInfoCard
                  player={otherPlayers[1]}
@@ -169,6 +170,7 @@ export function GameLayout({
                  isActivePlayer={gameState.currentPlayer === players.indexOf(otherPlayers[1])}
                  turnStatus={gameState.currentPlayer === players.indexOf(otherPlayers[1]) ? "出牌中" : "等待"}
                  cardCount={otherPlayers[1].cards.length}
+                 className="w-32 md:w-40"
                />
              )}
            </div>
@@ -182,11 +184,12 @@ export function GameLayout({
                playHistory={gameState.playHistory}
                currentTurn={gameState.turnCount}
                gameStatus={gameState.status}
+               className="w-full max-w-md md:max-w-lg"
              />
            </div>
 
            {/* 右侧玩家 */}
-           <div className="flex-1 flex justify-end pr-8">
+           <div className="flex-1 flex justify-end pr-4 md:pr-8">
              {otherPlayers.length > 2 && (
                <PlayerInfoCard
                  player={otherPlayers[2]}
@@ -195,13 +198,14 @@ export function GameLayout({
                  isActivePlayer={gameState.currentPlayer === players.indexOf(otherPlayers[2])}
                  turnStatus={gameState.currentPlayer === players.indexOf(otherPlayers[2]) ? "出牌中" : "等待"}
                  cardCount={otherPlayers[2].cards.length}
+                 className="w-32 md:w-40"
                />
              )}
            </div>
          </div>
 
          {/* 底部当前玩家区域 */}
-         <div className="flex-1 flex items-end justify-center pb-8">
+         <div className="flex-1 flex items-end justify-center pb-4 md:pb-8">
            <PlayerHandArea
              cards={myCards}
              selectedCards={selectedCards}
@@ -213,28 +217,29 @@ export function GameLayout({
              onPlay={onPlay}
              onPass={onPass}
              onSort={onSortCards}
+             className="w-full max-w-4xl mx-2 md:mx-4"
            />
          </div>
       </div>
 
       {/* 游戏状态覆盖层 */}
       {gameState.status === "waiting" && (
-        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 text-center">
-            <h2 className="text-2xl font-bold mb-4">等待其他玩家加入</h2>
-            <p className="text-gray-600">游戏将在所有玩家准备就绪后开始</p>
+        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 text-center max-w-md w-full">
+            <h2 className="text-xl md:text-2xl font-bold mb-4">等待其他玩家加入</h2>
+            <p className="text-gray-600 text-sm md:text-base">游戏将在所有玩家准备就绪后开始</p>
           </div>
         </div>
       )}
 
       {gameState.status === "playing" && (
-        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 text-center">
-            <h2 className="text-2xl font-bold mb-4">游戏进行中</h2>
-            <p className="text-gray-600 mb-6">游戏已经开始，请等待您的回合</p>
+        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 text-center max-w-md w-full">
+            <h2 className="text-xl md:text-2xl font-bold mb-4">游戏进行中</h2>
+            <p className="text-gray-600 mb-6 text-sm md:text-base">游戏已经开始，请等待您的回合</p>
             <button
               onClick={onCloseStats}
-              className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm md:text-base"
             >
               继续游戏
             </button>
@@ -243,21 +248,21 @@ export function GameLayout({
       )}
 
       {gameState.status === "finished" && (
-        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 text-center">
-            <h2 className="text-2xl font-bold mb-4">游戏结束</h2>
-            <p className="text-gray-600 mb-6">恭喜获胜者！</p>
+        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 text-center max-w-md w-full">
+            <h2 className="text-xl md:text-2xl font-bold mb-4">游戏结束</h2>
+            <p className="text-gray-600 mb-6 text-sm md:text-base">恭喜获胜者！</p>
             {isHost && (
-              <div className="space-x-4">
+              <div className="space-x-4 flex flex-col md:flex-row gap-2 md:gap-4">
                 <button
                   onClick={onStartNewGame}
-                  className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                  className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm md:text-base"
                 >
                   开始新游戏
                 </button>
                 <button
                   onClick={onEndGame}
-                  className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                  className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm md:text-base"
                 >
                   结束游戏
                 </button>
@@ -269,12 +274,12 @@ export function GameLayout({
 
       {/* 其他UI组件 */}
       {showOptions && (
-        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8">
+        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
             <h2 className="text-xl font-bold mb-4">游戏选项</h2>
             <button
               onClick={onCloseOptions}
-              className="mt-4 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+              className="mt-4 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm md:text-base"
             >
               关闭
             </button>
@@ -283,12 +288,12 @@ export function GameLayout({
       )}
 
       {showStats && (
-        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8">
+        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
             <h2 className="text-xl font-bold mb-4">游戏统计</h2>
             <button
               onClick={onCloseStats}
-              className="mt-4 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+              className="mt-4 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm md:text-base"
             >
               关闭
             </button>
@@ -297,12 +302,12 @@ export function GameLayout({
       )}
 
       {showThemeSelector && (
-        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8">
+        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
             <h2 className="text-xl font-bold mb-4">主题选择</h2>
             <button
               onClick={onCloseThemeSelector}
-              className="mt-4 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+              className="mt-4 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm md:text-base"
             >
               关闭
             </button>

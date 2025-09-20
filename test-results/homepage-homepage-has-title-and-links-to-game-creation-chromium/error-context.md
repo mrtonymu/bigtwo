@@ -1,0 +1,51 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "CNFLIX 🎬" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e6] [cursor=pointer]:
+            - generic [ref=e9] [cursor=pointer]: CNFLIX
+            - generic [ref=e11] [cursor=pointer]: 🎬
+        - link "使用说明" [ref=e13] [cursor=pointer]:
+          - /url: /rules
+    - main [ref=e14]:
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - generic [ref=e18]:
+            - generic [ref=e21]: CNFLIX
+            - generic [ref=e23]: 🎬
+          - generic [ref=e25]:
+            - textbox "观影者名称" [ref=e26]: Test Player
+            - textbox "观影房间名称" [ref=e27]: Test Game
+            - button "创建观影房间" [active] [ref=e28]
+            - button "观影设置" [ref=e29]
+        - generic [ref=e30]:
+          - generic [ref=e32]:
+            - generic [ref=e33]:
+              - generic [ref=e34]:
+                - generic [ref=e37]: CNFLIX
+                - generic [ref=e39]: 🎬
+              - generic [ref=e40]: 游戏房间
+            - button "🔄" [ref=e41]:
+              - generic [ref=e42]: 🔄
+          - generic [ref=e44]:
+            - generic [ref=e45]:
+              - generic [ref=e46]: 房间名称
+              - generic [ref=e47]: 玩家
+              - generic [ref=e48]: 观众
+              - generic [ref=e49]: 状态
+              - generic [ref=e50]: 操作
+            - generic [ref=e51]:
+              - generic [ref=e52]: Demo
+              - generic [ref=e53]: 4/4
+              - generic [ref=e54]: "0"
+              - generic [ref=e56]: 游戏中
+              - button "👁 观看" [ref=e58]:
+                - generic [ref=e59]: 👁
+                - text: 观看
+  - alert [ref=e60]
+```
