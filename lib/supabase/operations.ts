@@ -15,6 +15,8 @@ import {
   type PaginatedResponse
 } from './database.types'
 import { ErrorHandler, createAppError, ErrorCode } from '@/lib/utils/error-handler'
+import { withPooledConnection } from '@/lib/utils/connection-pool'
+import { requestDeduplicator, GameRequestKeys } from '@/lib/utils/request-deduplicator'
 
 /**
  * 类型安全的Supabase数据库操作封装
@@ -22,6 +24,11 @@ import { ErrorHandler, createAppError, ErrorCode } from '@/lib/utils/error-handl
  * 注意：由于Supabase TypeScript类型推断的已知限制，
  * 我们在内部使用any断言，但对外提供完全类型安全的接口。
  * 这符合项目中其他Supabase使用模式，确保运行时稳定性。
+ * 
+ * 性能优化：
+ * - 使用连接池减少连接开销
+ * - 请求去重避免重复操作
+ * - 智能缓存提升响应速度
  */
 class SupabaseOperations {
   private client = createClient()
@@ -420,58 +427,68 @@ class SupabaseOperations {
   }
 
   /**
-   * 获取游戏完整信息（游戏+玩家+状态）
+   * 获取游戏详情（优化版本 - 使用连接池和去重）
    */
   async getGameDetails(gameId: string): Promise<SupabaseResponse<{
     game: Game;
     players: Player[];
     gameState: GameState | null;
   }>> {
-    try {
-      // 并发获取所有数据
-      const [gameResult, playersResult, stateResult] = await Promise.allSettled([
-        this.getGame(gameId),
-        this.getGamePlayers(gameId),
-        this.getGameState(gameId)
-      ])
+    return requestDeduplicator.dedupe(
+      GameRequestKeys.gameDetails(gameId),
+      async () => {
+        return withPooledConnection(async (client) => {
+          try {
+            console.log(`🔍 获取游戏详情: ${gameId}`)
+            
+            // 并行获取所有数据以提升性能
+            const [gameResult, playersResult, gameStateResult] = await Promise.all([
+              (client as any).from('games').select().eq('id', gameId).single(),
+              (client as any).from('players').select().eq('game_id', gameId).order('position'),
+              (client as any).from('game_state').select().eq('game_id', gameId).single()
+            ])
 
-      // 检查游戏信息
-      if (gameResult.status === 'rejected' || gameResult.value.error) {
-        const error = gameResult.status === 'rejected' 
-          ? ErrorHandler.handleSupabaseError(new Error('Failed to fetch game'), 'getGameDetails')
-          : gameResult.value.error!
-        return { data: null, error }
-      }
+            // 检查游戏是否存在
+            if (gameResult.error) {
+              if (gameResult.error.code === 'PGRST116') {
+                const notFoundError = createAppError(ErrorCode.GAME_NOT_FOUND, `游戏 ${gameId} 不存在`)
+                return { data: null, error: notFoundError }
+              }
+              const handledError = ErrorHandler.handleSupabaseError(gameResult.error, 'getGameDetails')
+              return { data: null, error: handledError }
+            }
 
-      // 检查玩家信息
-      if (playersResult.status === 'rejected' || playersResult.value.error) {
-        const error = playersResult.status === 'rejected'
-          ? ErrorHandler.handleSupabaseError(new Error('Failed to fetch players'), 'getGameDetails')
-          : playersResult.value.error!
-        return { data: null, error }
-      }
+            // 检查玩家数据
+            if (playersResult.error) {
+              const handledError = ErrorHandler.handleSupabaseError(playersResult.error, 'getGameDetails')
+              return { data: null, error: handledError }
+            }
 
-      // 游戏状态可以为空（新游戏）
-      const gameState = stateResult.status === 'fulfilled' && !stateResult.value.error
-        ? stateResult.value.data
-        : null
+            // 游戏状态可能不存在（新游戏）
+            const gameState = gameStateResult.error ? null : gameStateResult.data as GameState
 
-      return {
-        data: {
-          game: gameResult.value.data!,
-          players: playersResult.value.data || [],
-          gameState
-        },
-        error: null
-      }
-    } catch (error) {
-      const handledError = ErrorHandler.handleSupabaseError(error, 'getGameDetails')
-      return { data: null, error: handledError }
-    }
+            const result = {
+              game: gameResult.data as Game,
+              players: playersResult.data as Player[],
+              gameState
+            }
+
+            console.log(`✅ 游戏详情获取成功: ${gameId}`)
+            return { data: result, error: null }
+
+          } catch (error) {
+             console.error('❌ 获取游戏详情失败:', error)
+             const handledError = ErrorHandler.handleSupabaseError(error, 'getGameDetails')
+             return { data: null, error: handledError }
+           }
+        })
+      },
+      2000 // 2秒缓存
+    )
   }
 
   /**
-   * 验证玩家回合并执行出牌操作
+   * 验证并出牌（优化版本 - 使用去重防止重复提交）
    */
   async validateAndPlayCards(
     gameId: string, 
@@ -479,93 +496,43 @@ class SupabaseOperations {
     cards: any[], 
     expectedTurnCount: number
   ): Promise<SupabaseResponse<any>> {
-    try {
-      // 1. 获取游戏状态验证回合
-      const gameStateResult = await this.getGameState(gameId)
-      if (gameStateResult.error) {
-        return { data: null, error: gameStateResult.error }
-      }
+    return requestDeduplicator.dedupe(
+      GameRequestKeys.playCards(gameId, playerName, cards),
+      async () => {
+        return withPooledConnection(async (client) => {
+          try {
+            console.log(`🎮 玩家 ${playerName} 尝试出牌:`, cards)
+            
+            const { data, error } = await (client as any).rpc('validate_and_play_cards', {
+              p_game_id: gameId,
+              p_player_name: playerName,
+              p_cards: cards,
+              p_expected_turn_count: expectedTurnCount
+            })
 
-      const gameState = gameStateResult.data
-      if (!gameState) {
-        const error = createAppError(
-          ErrorCode.GAME_NOT_FOUND, 
-          '游戏状态不存在'
-        )
-        return { data: null, error: error }
-      }
+            if (error) {
+              console.error('❌ 出牌验证失败:', error)
+              const handledError = ErrorHandler.handleSupabaseError(error, 'validateAndPlayCards')
+              return { data: null, error: handledError }
+            }
 
-      // 2. 检查回合数是否匹配（防止并发）
-      if (gameState.turn_count !== expectedTurnCount) {
-        const error = createAppError(
-          ErrorCode.INVALID_PLAY, 
-          '回合已变化，请刷新后重试'
-        )
-        return { data: null, error: error }
-      }
+            // 出牌成功后，清除相关缓存
+            requestDeduplicator.invalidate(GameRequestKeys.gameDetails(gameId))
+            requestDeduplicator.invalidate(GameRequestKeys.gameState(gameId))
+            requestDeduplicator.invalidate(GameRequestKeys.players(gameId))
 
-      // 3. 获取玩家信息验证身份
-      const playersResult = await this.getGamePlayers(gameId)
-      if (playersResult.error) {
-        return { data: null, error: playersResult.error }
-      }
+            console.log(`✅ 出牌成功:`, data)
+            return { data, error: null }
 
-      const players = playersResult.data || []
-      const currentPlayer = players.find(p => p.player_name === playerName)
-      if (!currentPlayer) {
-        const error = createAppError(
-          ErrorCode.NOT_FOUND, 
-          '玩家不存在'
-        )
-        return { data: null, error: error }
-      }
-
-      // 4. 验证是否是该玩家的回合
-      if (gameState.current_player !== currentPlayer.position) {
-        const error = createAppError(
-          ErrorCode.NOT_YOUR_TURN, 
-          '当前不是您的回合'
-        )
-        return { data: null, error: error }
-      }
-
-      // 5. 更新玩家手牌
-      const newCards = currentPlayer.cards.filter(
-        (card: any) => !cards.some((selected: any) => 
-          selected.suit === card.suit && selected.rank === card.rank
-        )
-      )
-
-      const updatePlayerResult = await this.updatePlayerCards(gameId, playerName, newCards)
-      if (updatePlayerResult.error) {
-        return { data: null, error: updatePlayerResult.error }
-      }
-
-      // 6. 更新游戏状态
-      const nextPlayer = (gameState.current_player + 1) % players.length
-      const updateStateResult = await this.updateGameState(gameId, {
-        current_player: nextPlayer,
-        last_play: cards,
-        last_player: currentPlayer.position,
-        turn_count: gameState.turn_count + 1
-      })
-
-      if (updateStateResult.error) {
-        return { data: null, error: updateStateResult.error }
-      }
-
-      return { 
-        data: { 
-          newCards, 
-          nextPlayer, 
-          turnCount: gameState.turn_count + 1 
-        }, 
-        error: null 
-      }
-    } catch (error) {
-      const handledError = ErrorHandler.handleSupabaseError(error, 'validateAndPlayCards')
-      return { data: null, error: handledError }
-    }
+          } catch (error) {
+            console.error('❌ 出牌操作失败:', error)
+            const handledError = ErrorHandler.handleSupabaseError(error, 'validateAndPlayCards')
+            return { data: null, error: handledError }
+          }
+        })
+      },
+      500 // 短缓存，防止重复点击
+    )
   }
 
   /**

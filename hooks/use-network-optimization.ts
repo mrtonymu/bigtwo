@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabaseOps } from '@/lib/supabase/operations'
 import { ErrorHandler } from '@/lib/utils/error-handler'
+import { connectionPool } from '@/lib/utils/connection-pool'
+import { requestDeduplicator } from '@/lib/utils/request-deduplicator'
 import { 
   type NetworkOptimizationOptions, 
   type GameSyncData, 
@@ -49,11 +51,25 @@ export function useNetworkOptimization(options: NetworkOptimizationOptions) {
       setNetworkStatus('offline')
     }
 
-    // 检测网络质量
+  // 检测网络质量 - 使用连接池优化
     const checkNetworkQuality = async () => {
       try {
         const startTime = performance.now()
-        const result = await supabaseOps.checkConnection()
+        
+        // 使用请求去重避免重复的网络质量检测
+        const result = await requestDeduplicator.dedupe(
+          'network-quality-check',
+          async () => {
+            const client = await connectionPool.getConnection()
+            try {
+              const connectionResult = await supabaseOps.checkConnection()
+              return connectionResult
+            } finally {
+              connectionPool.releaseConnection(client)
+            }
+          }
+        ) as { connected: boolean }
+        
         const endTime = performance.now()
         const latency = endTime - startTime
 
@@ -85,7 +101,7 @@ export function useNetworkOptimization(options: NetworkOptimizationOptions) {
     }
   }, [])
 
-  // 执行完整同步
+  // 执行完整同步 - 使用性能优化
   const performFullSync = useCallback(async () => {
     if (syncStatus === 'syncing') return
 
@@ -93,8 +109,18 @@ export function useNetworkOptimization(options: NetworkOptimizationOptions) {
     try {
       console.log('🔄 执行完整游戏状态同步...')
       
-      // 获取最新的游戏数据
-      const gameDetails = await supabaseOps.getGameDetails(gameId)
+      // 使用请求去重避免重复同步
+      const gameDetails = await requestDeduplicator.dedupe(
+        `game-sync-${gameId}`,
+        async () => {
+          const client = await connectionPool.getConnection()
+          try {
+            return await supabaseOps.getGameDetails(gameId)
+          } finally {
+            connectionPool.releaseConnection(client)
+          }
+        }
+      ) as any
       
       if (gameDetails.error) {
         throw new Error(gameDetails.error.message)
@@ -122,7 +148,7 @@ export function useNetworkOptimization(options: NetworkOptimizationOptions) {
           lastPlay: [],
           playHistory: []
         },
-        players: serverData.players ? serverData.players.map(p => ({
+        players: serverData.players ? serverData.players.map((p: any) => ({
           id: p.id,
           name: p.player_name,
           position: p.position,

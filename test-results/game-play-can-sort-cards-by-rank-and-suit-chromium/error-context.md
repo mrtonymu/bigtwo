@@ -48,5 +48,12 @@
                 - button "👁 观看" [disabled]:
                   - generic: 👁
                   - text: 观看
-  - alert [ref=e57]
+            - generic [ref=e57]:
+              - generic [ref=e58]: Test Game
+              - generic [ref=e59]: 0/4
+              - generic [ref=e60]: "0"
+              - generic [ref=e62]: 等待中
+              - generic [ref=e63]:
+                - button "加入游戏" [disabled]
+  - alert [ref=e64]
 ```

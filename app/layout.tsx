@@ -2,7 +2,6 @@ import React, { Suspense } from "react"
 import type { Metadata, Viewport } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import "../styles/mobile-optimizations.css"
 import { ToastProvider } from "@/components/toast-provider"
 import { DataCleanupProvider } from "@/components/data-cleanup-provider"
 

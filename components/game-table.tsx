@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { GameOptions, type GameOptions as GameOptionsType, loadGameOptions } from "@/components/game-options"
+import { PerformanceMonitor } from '@/components/performance-monitor'
 import Link from "next/link"
 import toast from "react-hot-toast"
 import { useSmartDataSync } from "@/lib/utils/database-optimizer"

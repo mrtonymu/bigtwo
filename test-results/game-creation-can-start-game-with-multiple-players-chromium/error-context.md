@@ -2,51 +2,19 @@
 
 ```yaml
 - generic [active] [ref=e1]:
-  - generic [ref=e2]:
-    - banner [ref=e3]:
-      - generic [ref=e4]:
-        - link "CNFLIX 🎬" [ref=e5] [cursor=pointer]:
-          - /url: /
-          - generic [ref=e6] [cursor=pointer]:
-            - generic [ref=e9] [cursor=pointer]: CNFLIX
-            - generic [ref=e11] [cursor=pointer]: 🎬
-        - link "使用说明" [ref=e13] [cursor=pointer]:
-          - /url: /rules
-    - main [ref=e14]:
-      - generic [ref=e15]:
-        - generic [ref=e16]:
-          - generic [ref=e18]:
-            - generic [ref=e21]: CNFLIX
-            - generic [ref=e23]: 🎬
-          - generic [ref=e25]:
-            - textbox "观影者名称" [ref=e26]
-            - textbox "观影房间名称" [ref=e27]
-            - button "创建观影房间" [disabled]
-            - button "观影设置" [ref=e28]
-        - generic [ref=e29]:
-          - generic [ref=e31]:
-            - generic [ref=e32]:
-              - generic [ref=e33]:
-                - generic [ref=e36]: CNFLIX
-                - generic [ref=e38]: 🎬
-              - generic [ref=e39]: 游戏房间
-            - button "🔄" [ref=e40]:
-              - generic [ref=e41]: 🔄
-          - generic [ref=e43]:
-            - generic [ref=e44]:
-              - generic [ref=e45]: 房间名称
-              - generic [ref=e46]: 玩家
-              - generic [ref=e47]: 观众
-              - generic [ref=e48]: 状态
-              - generic [ref=e49]: 操作
-            - generic [ref=e50]:
-              - generic [ref=e51]: Demo
-              - generic [ref=e52]: 4/4
-              - generic [ref=e53]: "0"
-              - generic [ref=e55]: 游戏中
-              - generic [ref=e56]:
-                - button "👁 观看" [disabled]:
-                  - generic: 👁
-                  - text: 观看
-  - alert [ref=e57]
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: 2♠
+      - heading "CNFLIX" [level=1] [ref=e7]
+    - heading "Waiting for Players" [level=2] [ref=e8]
+    - paragraph [ref=e9]: "Players: 1/4"
+    - generic [ref=e10]: 需要至少2名玩家开始游戏
+    - generic [ref=e11]:
+      - heading "Current Players:" [level=3] [ref=e12]
+      - generic [ref=e14]: 1. Host
+    - generic [ref=e15]:
+      - button "🏁 结束游戏" [ref=e17]
+      - link "Back to Lobby" [ref=e18] [cursor=pointer]:
+        - /url: /
+  - alert [ref=e19]
 ```

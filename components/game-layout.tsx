@@ -4,6 +4,7 @@ import { PlayerInfoCard } from "@/components/player-info-card"
 import { GameCenterArea } from "@/components/game-center-area"
 import { PlayerHandArea } from "@/components/player-hand-area"
 import { type Player, type Card as GameCard, type PlayHistory, type CardHint } from "@/lib/game-logic"
+import { PerformanceMonitor } from "@/components/performance-monitor"
 import { cn } from "@/lib/utils"
 
 interface GameLayoutProps {
@@ -143,6 +144,11 @@ export function GameLayout({
 
       {/* 游戏布局 */}
       <div className="relative z-10 h-screen flex flex-col">
+        {/* 性能监控 - 右上角 */}
+        <div className="absolute top-4 right-4 z-50">
+          <PerformanceMonitor gameId={gameId} className="opacity-80 hover:opacity-100 transition-opacity" />
+        </div>
+
         {/* 顶部玩家区域 */}
          <div className="flex-1 flex items-start justify-center pt-4 md:pt-8">
            {otherPlayers.length > 0 && (

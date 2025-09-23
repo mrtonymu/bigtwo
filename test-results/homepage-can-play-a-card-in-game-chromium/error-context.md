@@ -19,7 +19,7 @@
             - generic [ref=e21]: CNFLIX
             - generic [ref=e23]: 🎬
           - generic [ref=e25]:
-            - textbox "观影者名称" [active] [ref=e26]: Player 1
+            - textbox "观影者名称" [ref=e26]: Player 1
             - textbox "观影房间名称" [ref=e27]: Test Game
             - button "创建观影房间" [ref=e28]
             - button "观影设置" [ref=e29]
@@ -47,5 +47,11 @@
               - button "👁 观看" [ref=e58]:
                 - generic [ref=e59]: 👁
                 - text: 观看
-  - alert [ref=e60]
+            - generic [ref=e60]:
+              - generic [ref=e61]: Test Game
+              - generic [ref=e62]: 1/4
+              - generic [ref=e63]: "0"
+              - generic [ref=e65]: 等待中
+              - button "加入游戏" [active] [ref=e67]
+  - alert [ref=e68]
 ```
